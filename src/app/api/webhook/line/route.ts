@@ -27,35 +27,67 @@ export async function POST(req: NextRequest) {
         
         if (urlMatch) {
           const url = urlMatch[0];
+          console.log(`[Webhook] 開始處理 URL: ${url}`);
           await replyMessage(replyToken, "🌟 偵測到靈感連結，正在捕捉中...");
 
-          // 核心處理流程
-          const title = await extractTitle(url);
-          const tags = await generateInspirationTags(title);
-          const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+          try {
+            // 核心處理流程
+            console.log(`[Webhook] 提取標題中...`);
+            const title = await extractTitle(url);
+            
+            console.log(`[Webhook] 生成 AI 標籤中...`);
+            const tags = await generateInspirationTags(title);
+            
+            const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
 
-          // 寫入 Google Sheets
-          await appendToSheet({
-            time,
-            title,
-            tags,
-            source: url
-          });
+            console.log(`[Webhook] 寫入 Google Sheets 中...`);
+            await appendToSheet({
+              time,
+              title,
+              tags,
+              source: url
+            });
 
-          // 第二次通知 (這裡需要 push message 或在背景處理，但 reply 只能用一次)
-          // 註：這是一個簡化版，真實環境中複數訊息需考慮 API 限制
+            console.log(`[Webhook] 全部完成，發送 Push Message 通知`);
+            // 推送成功訊息 (因為 replyToken 只能用一次，所以這裡用 pushMessage)
+            // 註：這需要知道 userId，我們從 event 取得
+            const userId = event.source.userId;
+            if (userId) {
+              await pushMessage(userId, `✅ 靈感已收藏！\n\n📌 標題：${title}\n🏷️ 標籤：${tags.join(" ")}`);
+            }
+          } catch (err) {
+            console.error("[Webhook] URL 處理失敗:", err);
+            const userId = event.source.userId;
+            if (userId) {
+              await pushMessage(userId, `❌ 收藏失敗：網路連線逾時或 API 錯誤。\n請確認試算表權限與 Gemini 金鑰。`);
+            }
+          }
         } else {
           // 純文字收藏
           await replyMessage(replyToken, "📝 正在將您的文字紀錄到靈感收藏盒...");
-          const tags = await generateInspirationTags(text);
-          const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
           
-          await appendToSheet({
-            time,
-            title: text,
-            tags,
-            source: "LINE 文字訊息"
-          });
+          try {
+            const tags = await generateInspirationTags(text);
+            const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+            
+            await appendToSheet({
+              time,
+              title: text,
+              tags,
+              source: "LINE 文字訊息"
+            });
+
+            const userId = event.source.userId;
+            if (userId) {
+              await pushMessage(userId, `✅ 文字靈感已收藏！\n🏷️ AI 標籤：${tags.join(" ")}`);
+            }
+          } catch (err) {
+            console.error("[Webhook] 文字處理失敗:", err);
+            const userId = event.source.userId;
+            if (userId) {
+              await pushMessage(userId, `❌ 文字收藏失敗，請稍後再試。`);
+            }
+          }
         }
       }
     }

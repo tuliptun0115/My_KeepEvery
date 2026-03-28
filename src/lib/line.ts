@@ -35,4 +35,28 @@ export async function replyMessage(replyToken: string, text: string) {
   } catch (error) {
     console.error("LINE API connection error:", error);
   }
+}/**
+ * 推播 LINE 訊息 (主動通知)
+ */
+export async function pushMessage(to: string, text: string) {
+  try {
+    const response = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({
+        to,
+        messages: [{ type: "text", text }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("[LINE Push] Error:", errorData);
+    }
+  } catch (error) {
+    console.error("[LINE Push] Connection error:", error);
+  }
 }
