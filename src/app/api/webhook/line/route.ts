@@ -47,8 +47,15 @@ export async function POST(req: NextRequest) {
             console.log(`[Webhook] 生成 AI 標籤中... (附帶使用者文字)`);
             // 把網頁標題與使用者打的字混在一起丟給 AI，給他最大量的判斷情報
             const aiContent = surroundingText ? `[原標題: ${title}] 使用者備註: ${surroundingText}` : title;
-            const tags = await generateInspirationTags(aiContent, url);
+            const geminiResult = await generateInspirationTags(aiContent, url);
+            const tags = geminiResult.tags;
             
+            // 如果 Gemini 有查出真正的標題，我們就把它換回去！(完美解決 FB/IG 沒文案也沒標題的狀況)
+            if (geminiResult.real_title) {
+              console.log(`[Webhook] Gemini 利用搜尋找回了真實標題：${geminiResult.real_title}`);
+              title = geminiResult.real_title;
+            }
+
             const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
             
             console.log(`[Webhook] 寫入 Google Sheets 中...`);
@@ -78,7 +85,8 @@ export async function POST(req: NextRequest) {
           await replyMessage(replyToken, "📝 正在將您的文字紀錄到靈感收藏盒...");
           
           try {
-            const tags = await generateInspirationTags(text);
+            const geminiResult = await generateInspirationTags(text);
+            const tags = geminiResult.tags;
             const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
             
             await appendToSheet({
