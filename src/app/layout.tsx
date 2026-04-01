@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "靈感收藏盒 - 抓住每一閃現的靈感",
   description: "一款專為靈感打造的輕量化收藏工具",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

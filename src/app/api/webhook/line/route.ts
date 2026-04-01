@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
             const title = await extractTitle(url);
             
             console.log(`[Webhook] 生成 AI 標籤中...`);
-            const tags = await generateInspirationTags(title);
+            const tags = await generateInspirationTags(title, url);
             
             const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-
+            
             console.log(`[Webhook] 寫入 Google Sheets 中...`);
             await appendToSheet({
               time,
