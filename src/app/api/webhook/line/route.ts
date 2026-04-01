@@ -71,14 +71,7 @@ export async function POST(req: NextRequest) {
             // 註：這需要知道 userId，我們從 event 取得
             const userId = event.source.userId;
             if (userId) {
-              let replyMsg = `✅ 靈感已收藏！\n\n📌 標題：${title}\n🏷️ 標籤：${tags.join(" ")}`;
-              
-              const isBlockedSocial = (title.includes("Facebook") || title.includes("Instagram") || title.includes("Log in")) && !surroundingText;
-              if (isBlockedSocial) {
-                replyMsg += `\n\n⚠️ 【防擋小提醒】Meta (FB/IG) 拒絕了外部機器人讀取這篇貼文，因此我無法看到內容。下次分享連結給我的時候，建議您「順手打幾個字」（例如：這是大谷翔平全壘打），我就能依據您的文字進行完美分類與標題設定哦！`;
-              }
-              
-              await pushMessage(userId, replyMsg);
+              await pushMessage(userId, `✅ 靈感已收藏！\n\n📌 標題：${title}\n🏷️ 標籤：${tags.join(" ")}`);
             }
           } catch (err) {
             console.error("[Webhook] URL 處理失敗:", err);
