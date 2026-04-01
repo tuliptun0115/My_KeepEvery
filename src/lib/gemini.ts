@@ -34,6 +34,9 @@ export async function generateInspirationTags(
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }]
+      }
     });
 
     const text = response.text ?? "";

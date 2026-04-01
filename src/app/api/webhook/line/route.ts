@@ -27,16 +27,27 @@ export async function POST(req: NextRequest) {
         
         if (urlMatch) {
           const url = urlMatch[0];
+          // 擷取網址以外的任何使用者附帶中文字
+          const surroundingText = text.replace(url, "").trim();
+
           console.log(`[Webhook] 開始處理 URL: ${url}`);
           await replyMessage(replyToken, "🌟 偵測到靈感連結，正在捕捉中...");
 
           try {
             // 核心處理流程
             console.log(`[Webhook] 提取標題中...`);
-            const title = await extractTitle(url);
+            let title = await extractTitle(url);
             
-            console.log(`[Webhook] 生成 AI 標籤中...`);
-            const tags = await generateInspirationTags(title, url);
+            // 如果爬蟲失敗只有抓到品牌名，而且使用者有附帶備註文字，我們就以使用者的文字為主
+            if (surroundingText && (title === "Facebook" || title === "Instagram" || title.includes("Log in"))) {
+              console.log(`[Webhook] 爬蟲可能遭擋，改用使用者附加文字作為標題: ${surroundingText}`);
+              title = surroundingText;
+            }
+
+            console.log(`[Webhook] 生成 AI 標籤中... (附帶使用者文字)`);
+            // 把網頁標題與使用者打的字混在一起丟給 AI，給他最大量的判斷情報
+            const aiContent = surroundingText ? `[原標題: ${title}] 使用者備註: ${surroundingText}` : title;
+            const tags = await generateInspirationTags(aiContent, url);
             
             const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
             
