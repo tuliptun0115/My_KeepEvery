@@ -12,6 +12,10 @@ const OEMBED_PROVIDERS: Record<string, (url: string) => string> = {
     `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
   "youtu.be": (url) =>
     `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+  "threads.net": (url) =>
+    `https://www.threads.net/oembed/?url=${encodeURIComponent(url)}&format=json`,
+  "threads.com": (url) =>
+    `https://www.threads.net/oembed/?url=${encodeURIComponent(url)}&format=json`,
 };
 
 async function tryOEmbed(url: string): Promise<string | null> {
@@ -56,6 +60,7 @@ const SOCIAL_DOMAINS = [
   "facebook.com",
   "instagram.com",
   "threads.net",
+  "threads.com",
   "x.com",
   "twitter.com",
 ];
@@ -210,6 +215,7 @@ function fallbackTitle(url: string): string {
       "facebook.com": "Facebook",
       "instagram.com": "Instagram",
       "threads.net": "Threads",
+      "threads.com": "Threads",
       "x.com": "X (Twitter)",
       "twitter.com": "X (Twitter)",
     };

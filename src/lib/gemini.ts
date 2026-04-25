@@ -18,26 +18,21 @@ export async function generateInspirationTags(
 ): Promise<{tags: string[], real_title: string | null}> {
   try {
     const prompt = `
-你是一個靈感分類專家。請針對以下資訊，提供 3 個精簡且具有代表性的繁體中文標籤（帶有 # 號），並且如果原標題無效，請利用 Google 搜尋還原真實標題。
+你是一個靈感分類專家。請根據以下標題或內容，提供 3 個精簡且具有代表性的繁體中文標籤（帶有 # 號）。
 
 原標題或內容：${content}
 來源網址：${url}
 
 規則：
-1. 如果「原標題或內容」是有意義的文字，請根據它來分類，並且 \`real_title\` 欄位給 null。
-2. 【極度重要】如果收到 "Facebook"、"來自 Facebook 的分享"、"Instagram" 或 "Threads" 等廢字，代表標題抓取失敗。這時你**必須強制啟動 Google Search** 針對網址進行搜尋！查出發文者或內容大意後：
-   - 給出正確的 tags
-   - 將你查到的真實大意或發文者名稱填入 \`real_title\`（例如 "大谷翔平粉專貼文" 或 "CNN: 最新選情"）。
-3. 僅回傳 JSON 格式：{"tags": ["#標籤1", "#標籤2", "#標籤3"], "real_title": "字串或null"}
+1. 直接根據「原標題或內容」的文字進行分類，\`real_title\` 給 null。
+2. 如果內容是 "來自 Facebook 的分享"、"來自 Threads 的分享" 等無意義通用文字，代表貼文無法被爬取，請給出 3 個通用標籤（如 #社群分享 #收藏 #待閱讀），\`real_title\` 給 null。
+3. 僅回傳 JSON 格式：{"tags": ["#標籤1", "#標籤2", "#標籤3"], "real_title": null}
 4. 不要包含任何額外的文字、解釋或 Markdown 語法。
 `;
 
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }]
-      }
     });
 
     const text = response.text ?? "";
