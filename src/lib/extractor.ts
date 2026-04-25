@@ -12,6 +12,10 @@ const OEMBED_PROVIDERS: Record<string, (url: string) => string> = {
     `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
   "youtu.be": (url) =>
     `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+  "threads.net": (url) =>
+    `https://www.threads.net/oembed/?url=${encodeURIComponent(url)}&format=json`,
+  "threads.com": (url) =>
+    `https://www.threads.net/oembed/?url=${encodeURIComponent(url)}&format=json`,
 };
 
 async function tryOEmbed(url: string): Promise<string | null> {
@@ -56,6 +60,7 @@ const SOCIAL_DOMAINS = [
   "facebook.com",
   "instagram.com",
   "threads.net",
+  "threads.com",
   "x.com",
   "twitter.com",
 ];
@@ -104,7 +109,7 @@ async function tryHtmlParse(url: string): Promise<string | null> {
       Accept:
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-      Range: "bytes=0-32768",
+      Range: "bytes=0-65535",
     };
 
     const response = await fetch(url, {
@@ -154,19 +159,23 @@ function parseTitle(html: string): string | null {
     }
   }
 
-  // 2. og:title
+  // 2. og:title (支援各種引號與屬性順序)
   const ogMatch =
-    html.match(
-      /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i
-    ) ||
-    html.match(
-      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i
-    );
+    html.match(/<meta[^>]*property=["']?og:title["']?[^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']?og:title["']?/i);
   if (ogMatch?.[1] && ogMatch[1].trim().length > 2) {
     return decodeHtmlEntities(ogMatch[1].trim());
   }
 
-  // 3. <title>
+  // 3. twitter:title (常見備用 meta)
+  const twitterMatch =
+    html.match(/<meta[^>]*name=["']?twitter:title["']?[^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']?twitter:title["']?/i);
+  if (twitterMatch?.[1] && twitterMatch[1].trim().length > 2) {
+    return decodeHtmlEntities(twitterMatch[1].trim());
+  }
+
+  // 4. <title>
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   if (titleMatch?.[1]) {
     const raw = titleMatch[1].trim();
@@ -182,11 +191,14 @@ function parseTitle(html: string): string | null {
 
 function decodeHtmlEntities(str: string): string {
   return str
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&ndash;/g, "–")
     .replace(/&mdash;/g, "—")
     .replace(/&nbsp;/g, " ");
@@ -203,6 +215,7 @@ function fallbackTitle(url: string): string {
       "facebook.com": "Facebook",
       "instagram.com": "Instagram",
       "threads.net": "Threads",
+      "threads.com": "Threads",
       "x.com": "X (Twitter)",
       "twitter.com": "X (Twitter)",
     };
@@ -234,6 +247,10 @@ export async function extractTitle(url: string): Promise<string> {
     console.log(`[Extractor] 偵測到社群網域 ${hostname}，使用 Microlink API 解析`);
     const socialTitle = await trySocialApi(url);
     if (socialTitle) return socialTitle;
+    // Microlink 失敗時，也嘗試 HTML 解析 (X/Threads 有時可直接爬取)
+    console.log(`[Extractor] Microlink 失敗，嘗試 HTML 解析作為備援`);
+    const htmlFallback = await tryHtmlParse(url);
+    if (htmlFallback) return htmlFallback;
   } else {
     // 第三層：HTML 解析 (一般網站)
     const htmlTitle = await tryHtmlParse(url);

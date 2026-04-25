@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
             console.log(`[Webhook] 提取標題中...`);
             let title = await extractTitle(url);
             
-            // 如果爬蟲失敗只有抓到品牌名，而且使用者有附帶備註文字，我們就以使用者的文字為主
-            if (surroundingText && (title === "Facebook" || title === "Instagram" || title.includes("Log in"))) {
+            // 如果爬蟲失敗（回傳 fallback 文字），且使用者有附帶備註文字，以使用者的文字為主
+            const isFallbackTitle = title.startsWith("來自 ") || title === "無法提取標題" || title.includes("Log in");
+            if (surroundingText && isFallbackTitle) {
               console.log(`[Webhook] 爬蟲可能遭擋，改用使用者附加文字作為標題: ${surroundingText}`);
               title = surroundingText;
             }
