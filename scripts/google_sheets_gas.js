@@ -11,6 +11,39 @@
  * 程式內含 SECRET_TOKEN 驗證，請確保與 .env.local 一致
  */
 
+function doGet(e) {
+  // 安全驗證碼：需與您的 .env.local 中的 GOOGLE_GAS_SECRET 一致
+  var SECRET_TOKEN = "KEEP_EVERY_SECRET_123"; 
+  
+  // 安全性檢查
+  if (e.parameter.secret !== SECRET_TOKEN) {
+    return ContentService.createTextOutput("Unauthorized").setStatusCode(401);
+  }
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  
+  // 若分頁為空 (僅標題或全空)
+  if (data.length <= 1) {
+    return ContentService.createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 將資料轉為物件陣列 (假設第一列是 Header)
+  var jsonData = [];
+  for (var i = 1; i < data.length; i++) {
+    jsonData.push({
+      time: data[i][0],
+      title: data[i][1],
+      tags: data[i][2],
+      source: data[i][3]
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(jsonData))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   // 安全驗證碼：需與您的 .env.local 中的 GOOGLE_GAS_SECRET 一致
   var SECRET_TOKEN = "KEEP_EVERY_SECRET_123"; 

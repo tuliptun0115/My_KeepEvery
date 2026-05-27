@@ -34,3 +34,21 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 靈感收藏盒 全域樣式修正 */
+.rotate-\[-1deg\] { transform: rotate(-1deg); }
+.border-3 { border-width: 3px; }
+.shadow-sticker { 
+  box-shadow: 6px 6px 0px #2D2D2D; 
+}
+.shadow-sticker-hover { 
+  box-shadow: 10px 10px 0px #2D2D2D; 
+}
+.text-keep-border { color: #2D2D2D; }
+.bg-keep-pink { background-color: #FFB6C1; }
+.bg-keep-mint { background-color: #B2F5EA; }
+.bg-keep-yellow { background-color: #FEEBC8; }
+.border-keep-border { border-color: #2D2D2D; }
+.drop-shadow-sticker {
+  filter: drop-shadow(4px 4px 0px #4A4A4A);
+}
