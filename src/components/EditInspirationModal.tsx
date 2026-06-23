@@ -15,6 +15,21 @@ const USE_CASE_OPTIONS = [
   '產業研究'
 ];
 
+// 常見的主題分類選項
+const TOPIC_OPTIONS = [
+  '未分類',
+  'Prompt',
+  'AI 工具',
+  '社群行銷',
+  '產品設計',
+  '前端開發',
+  '工作流程',
+  '商業策略',
+  '內容創作',
+  '日常隨筆',
+  '其他'
+];
+
 interface EditInspirationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,6 +44,8 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
   const [customUseCase, setCustomUseCase] = useState('');
   const [isCustomUseCase, setIsCustomUseCase] = useState(false);
   const [topicCategory, setTopicCategory] = useState('');
+  const [customTopicCategory, setCustomTopicCategory] = useState('');
+  const [isCustomTopicCategory, setIsCustomTopicCategory] = useState(false);
   const [tagsInput, setTagsInput] = useState('');
   const [keyPoint1, setKeyPoint1] = useState('');
   const [keyPoint2, setKeyPoint2] = useState('');
@@ -42,8 +59,18 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
   useEffect(() => {
     if (record) {
       setSummary(record.summary || '');
-      setTopicCategory(record.topic_category || '');
       setRawInput(record.raw_input || '');
+      
+      // 主題處理
+      const topicVal = record.topic_category || '未分類';
+      if (TOPIC_OPTIONS.includes(topicVal)) {
+        setTopicCategory(topicVal);
+        setIsCustomTopicCategory(false);
+      } else {
+        setTopicCategory('自訂輸入');
+        setCustomTopicCategory(topicVal);
+        setIsCustomTopicCategory(true);
+      }
       
       // 標籤處理：以逗號與空格連接
       setTagsInput(record.tags ? record.tags.join(', ') : '');
@@ -79,6 +106,16 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
     }
   };
 
+  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setTopicCategory(val);
+    if (val === '自訂輸入') {
+      setIsCustomTopicCategory(true);
+    } else {
+      setIsCustomTopicCategory(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!summary.trim()) {
@@ -97,6 +134,9 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
       return;
     }
 
+    // 主題分類真值
+    const finalTopic = isCustomTopicCategory ? customTopicCategory.trim() : topicCategory;
+
     // 標籤拆分與清理
     const finalTags = tagsInput
       .split(',')
@@ -112,7 +152,7 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
       ...record,
       summary: summary.trim(),
       use_case: finalUseCase,
-      topic_category: topicCategory.trim() || '未分類',
+      topic_category: finalTopic || '未分類',
       tags: finalTags,
       key_points: finalKeyPoints,
       raw_input: rawInput,
@@ -215,16 +255,32 @@ export function EditInspirationModal({ isOpen, onClose, record, onSuccess }: Edi
 
             <div className="form-group">
               <label className="form-label">
-                主題分類
+                主題分類 <span className="required-star">*</span>
               </label>
-              <input
-                type="text"
-                className="form-input"
+              <select
+                className="filter-select"
                 value={topicCategory}
-                onChange={(e) => setTopicCategory(e.target.value)}
+                onChange={handleTopicChange}
                 disabled={isLoading}
-                placeholder="例如: AI 工具, 前端開發"
-              />
+                style={{ width: '100%', padding: '10px 12px' }}
+              >
+                {TOPIC_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                <option value="自訂輸入">✏️ 自訂輸入...</option>
+              </select>
+              {isCustomTopicCategory && (
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ marginTop: '8px' }}
+                  placeholder="輸入自訂主題分類"
+                  value={customTopicCategory}
+                  onChange={(e) => setCustomTopicCategory(e.target.value)}
+                  disabled={isLoading}
+                  required
+                />
+              )}
             </div>
           </div>
 
