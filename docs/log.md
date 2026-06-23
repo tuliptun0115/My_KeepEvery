@@ -491,5 +491,10 @@
   - 執行 `npm run lint`：通過，0 Errors。
   - 執行 `npm run build`：通過，Next.js 順利編譯。
 
-
-
+### v1.1.20-production-deployment-cloud-run — 2026-06-23
+- **[Deploy]** 「靈感收藏庫 V2 版」正式部署至 Google Cloud Run：
+  - **ESLint 忽略設定優化**：為防範 Next.js ESLint 檢查到非應用程式代碼（如 GAS 原始碼、批次遷移與清理腳本等）導致編譯阻擋，在 `eslint.config.mjs` 中將 `scratch/**`、`gas/**`、`docs/**`、`scripts/**` 加入 `globalIgnores` 忽略設定。
+  - **Unused Warning 清除**：修復了 `src/app/list/LibraryListClient.tsx` 中 `catch (_)` 無綁定 catch 變數警告，達成 0 Errors & 0 Warnings 建置目標。
+  - **Git 提交與 Push**：將本地所有開發變更與 GAS 代碼提交並推送到 GitHub `main` 分支，成功觸發 Google Cloud Build 自動化建置部署流程（Build ID: `36ef3d7f-c365-40c5-98d5-a64ad5e2f7db`）。
+  - **Cloud Run 環境變數對齊與更新**：Cloud Run 的 `GOOGLE_GAS_URL` 在舊版本中仍指向舊版 Apps Script Web App。我們使用 `gcloud run services update` 命令，將其環境變數手動更新為最新 Apps Script 版本 `@6` 的 URL：`https://script.google.com/macros/s/AKfycbzZGoeND8gr4W14TA1jrKkcCi05yAJLDLkpxgftV-zwEXh7STj1jFMAC5kgPzN0f45fWQ/exec`。這確保了線上版 Next.js `/api/inspiration/update` 後端與 Apps Script `update_row` 功能完美對接。
+  - **正式環境驗證 (Smoke Test)**：使用網頁存取工具驗證線上首頁 `/` 與列表頁 `/list` 皆可正常開啟且無 500 錯誤。統計卡片與最新筆數正常載入，分頁按鈕文字已改為 `« 最前頁` 與 `最後頁 »`。
