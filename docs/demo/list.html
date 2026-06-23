@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>收藏列表</title>
+  <link rel="stylesheet" href="./library-styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="cloud-wrap cloud-a" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="cloud-wrap cloud-b" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+    <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+    <main class="frame">
+      <section class="hero">
+        <div class="hero-main">
+          <a class="nav-pill" href="./library-demo.html">回首頁</a>
+          <div class="title-sticker">
+            <h1>收藏列表</h1>
+          </div>
+          <p class="hero-copy">依用途與主題篩選收藏，每頁顯示 10 筆，適合集中回找與瀏覽。</p>
+          <div id="list-hero-stats" class="hero-stats"></div>
+        </div>
+      </section>
+
+      <section class="controls toolbar-panel">
+        <div class="toolbar-row toolbar-list-primary">
+          <label class="search toolbar-search">
+            <input id="search-input" type="text" placeholder="搜尋摘要、標題、標籤或重點..." />
+          </label>
+          <select id="use-case-filter" class="filter-select"></select>
+          <select id="topic-filter" class="filter-select"></select>
+          <select id="sort-filter" class="filter-select narrow-select"></select>
+        </div>
+        <div class="toolbar-row toolbar-list-secondary">
+          <select id="platform-filter" class="filter-select"></select>
+          <select id="confidence-filter" class="filter-select"></select>
+          <select id="time-filter" class="filter-select"></select>
+          <button id="clear-filters" class="text-action" type="button">清除條件</button>
+        </div>
+      </section>
+
+      <section class="notice toolbar-meta-panel">
+        <div class="toolbar-row toolbar-summary-row">
+          <div id="result-count" class="toolbar-result">目前顯示 0 / 0 筆收藏。</div>
+          <div id="active-filters" class="notice-summary toolbar-summary"></div>
+        </div>
+      </section>
+
+      <section class="results">
+        <div id="list-grid" class="list-grid"></div>
+        <div id="empty-state" class="empty" hidden>目前沒有符合條件的收藏。</div>
+        <div id="pagination" class="pagination"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./library-data.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const pageSize = 10;
+    const searchInput = document.getElementById("search-input");
+    const useCaseFilter = document.getElementById("use-case-filter");
+    const topicFilter = document.getElementById("topic-filter");
+    const sortFilter = document.getElementById("sort-filter");
+    const platformFilter = document.getElementById("platform-filter");
+    const confidenceFilter = document.getElementById("confidence-filter");
+    const timeFilter = document.getElementById("time-filter");
+    const clearFiltersButton = document.getElementById("clear-filters");
+    const resultCount = document.getElementById("result-count");
+    const activeFilters = document.getElementById("active-filters");
+    const listHeroStats = document.getElementById("list-hero-stats");
+    const listGrid = document.getElementById("list-grid");
+    const emptyState = document.getElementById("empty-state");
+    const pagination = document.getElementById("pagination");
+
+    const state = {
+      keyword: params.get("keyword") || params.get("search") || "",
+      useCase: params.get("use_case") || "全部用途",
+      topic: params.get("topic") || "全部主題",
+      sort: params.get("sort") || "latest",
+      platform: params.get("platform") || "全部來源",
+      confidence: params.get("confidence") || "全部信心",
+      time: params.get("time") || "全部時間",
+      page: Number(params.get("page") || "1")
+    };
+
+    function renderTags(tags) {
+      return tags.slice(0, 4).map((tag) => `<span class="tag">#${tag}</span>`).join("");
+    }
+
+    function updateUrl() {
+      const nextParams = new URLSearchParams();
+      if (state.keyword) nextParams.set("keyword", state.keyword);
+      if (state.useCase !== "全部用途") nextParams.set("use_case", state.useCase);
+      if (state.topic !== "全部主題") nextParams.set("topic", state.topic);
+      if (state.sort !== "latest") nextParams.set("sort", state.sort);
+      if (state.platform !== "全部來源") nextParams.set("platform", state.platform);
+      if (state.confidence !== "全部信心") nextParams.set("confidence", state.confidence);
+      if (state.time !== "全部時間") nextParams.set("time", state.time);
+      if (state.page > 1) nextParams.set("page", String(state.page));
+      const query = nextParams.toString();
+      history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
+    }
+
+    function populateFilters() {
+      const useCaseOptions = ["全部用途", ...getUseCases()];
+      const topicOptions = ["全部主題", ...getTopicCategories()];
+      const platformOptions = ["全部來源", ...new Set(getOrderedRecords().map((item) => item.source_platform))];
+      const confidenceOptions = ["全部信心", "high", "medium", "low"];
+      const timeOptions = ["全部時間", "最近 3 天", "最近 7 天"];
+      const sortOptions = [
+        { value: "latest", label: "最新優先" },
+        { value: "oldest", label: "最舊優先" },
+        { value: "high_confidence", label: "高信心優先" }
+      ];
+      useCaseFilter.innerHTML = useCaseOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      topicFilter.innerHTML = topicOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      platformFilter.innerHTML = platformOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      confidenceFilter.innerHTML = confidenceOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      timeFilter.innerHTML = timeOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      sortFilter.innerHTML = sortOptions.map((item) => `<option value="${item.value}">${item.label}</option>`).join("");
+      useCaseFilter.value = state.useCase;
+      topicFilter.value = state.topic;
+      platformFilter.value = state.platform;
+      confidenceFilter.value = state.confidence;
+      timeFilter.value = state.time;
+      sortFilter.value = state.sort;
+      searchInput.value = state.keyword;
+    }
+
+    function isWithinTimeRange(item) {
+      if (state.time === "全部時間") {
+        return true;
+      }
+
+      const recordDate = new Date(item.created_at.replace(" ", "T"));
+      const latestDate = new Date(getOrderedRecords()[0].created_at.replace(" ", "T"));
+      const diffMs = latestDate - recordDate;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+      if (state.time === "最近 3 天") return diffDays <= 3;
+      if (state.time === "最近 7 天") return diffDays <= 7;
+      return true;
+    }
+
+    function filterRecords() {
+      const keyword = state.keyword.trim().toLowerCase();
+      const filtered = getOrderedRecords().filter((item) => {
+        const text = [
+          item.summary,
+          item.source_title,
+          item.tags.join(" "),
+          item.key_points.join(" "),
+          item.use_case,
+          item.topic_category
+        ].join(" ").toLowerCase();
+
+        const hitKeyword = !keyword || text.includes(keyword);
+        const hitUseCase = state.useCase === "全部用途" || item.use_case === state.useCase;
+        const hitTopic = state.topic === "全部主題" || item.topic_category === state.topic;
+        const hitPlatform = state.platform === "全部來源" || item.source_platform === state.platform;
+        const hitConfidence = state.confidence === "全部信心" || item.confidence_level === state.confidence;
+        const hitTime = isWithinTimeRange(item);
+        return hitKeyword && hitUseCase && hitTopic && hitPlatform && hitConfidence && hitTime;
+      });
+
+      if (state.sort === "oldest") {
+        return [...filtered].reverse();
+      }
+
+      if (state.sort === "high_confidence") {
+        const rank = { high: 0, medium: 1, low: 2 };
+        return [...filtered].sort((a, b) => {
+          const byConfidence = rank[a.confidence_level] - rank[b.confidence_level];
+          return byConfidence !== 0 ? byConfidence : b.created_at.localeCompare(a.created_at);
+        });
+      }
+
+      return filtered;
+    }
+
+    function renderCard(item, indexOffset) {
+      return `
+        <a class="record compact-record record-link" href="./detail.html?id=${encodeURIComponent(item.id)}">
+          <div class="compact-main">
+            <div class="record-top compact-top">
+              <div class="compact-meta">
+                <span class="record-number">${String(indexOffset).padStart(2, "0")}</span>
+                <span class="chip">${item.use_case}</span>
+                <span class="chip topic">${item.topic_category}</span>
+              </div>
+              <span class="record-time">${item.created_at}</span>
+            </div>
+            <div class="summary compact-summary">${item.summary}</div>
+            <div class="title compact-title">${item.source_title}</div>
+          </div>
+          <div class="compact-side">
+            <div class="tags compact-tags">${renderTags(item.tags)}</div>
+            <div class="record-actions compact-actions">
+              <span class="link-button subtle-button faux-button">查看內容</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderPagination(totalPages) {
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const prevPage = Math.max(1, state.page - 1);
+      const nextPage = Math.min(totalPages, state.page + 1);
+
+      const prevHref = new URLSearchParams();
+      const nextHref = new URLSearchParams();
+      if (state.keyword) {
+        prevHref.set("keyword", state.keyword);
+        nextHref.set("keyword", state.keyword);
+      }
+      if (state.useCase !== "全部用途") {
+        prevHref.set("use_case", state.useCase);
+        nextHref.set("use_case", state.useCase);
+      }
+      if (state.topic !== "全部主題") {
+        prevHref.set("topic", state.topic);
+        nextHref.set("topic", state.topic);
+      }
+      if (state.sort !== "latest") {
+        prevHref.set("sort", state.sort);
+        nextHref.set("sort", state.sort);
+      }
+      if (state.platform !== "全部來源") {
+        prevHref.set("platform", state.platform);
+        nextHref.set("platform", state.platform);
+      }
+      if (state.confidence !== "全部信心") {
+        prevHref.set("confidence", state.confidence);
+        nextHref.set("confidence", state.confidence);
+      }
+      if (state.time !== "全部時間") {
+        prevHref.set("time", state.time);
+        nextHref.set("time", state.time);
+      }
+      prevHref.set("page", String(prevPage));
+      nextHref.set("page", String(nextPage));
+
+      pagination.innerHTML = `
+        <a class="pager-link" href="?${prevHref.toString()}">上一頁</a>
+        <span class="page-state">第 ${state.page} / ${totalPages} 頁</span>
+        <a class="pager-link" href="?${nextHref.toString()}">下一頁</a>
+      `;
+    }
+
+    function render() {
+      const filtered = filterRecords();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      if (state.page > totalPages) state.page = totalPages;
+      if (state.page < 1) state.page = 1;
+      const start = (state.page - 1) * pageSize;
+      const pageRecords = filtered.slice(start, start + pageSize);
+
+      resultCount.textContent = `目前顯示 ${pageRecords.length} / ${filtered.length} 筆收藏。`;
+      const allRecords = getOrderedRecords();
+      const highCount = allRecords.filter((item) => item.confidence_level === "high").length;
+      const partialCount = allRecords.filter((item) => item.parse_status === "partial").length;
+      listHeroStats.innerHTML = `
+        <span>收藏總數 ${allRecords.length}</span>
+        <span>高信心內容 ${highCount}</span>
+        <span>部分解析 ${partialCount}</span>
+        <span>最新更新 ${allRecords[0].created_at}</span>
+      `;
+      const activeItems = [
+        state.keyword ? `關鍵字：${state.keyword}` : "",
+        state.useCase !== "全部用途" ? `用途：${state.useCase}` : "",
+        state.topic !== "全部主題" ? `主題：${state.topic}` : "",
+        state.platform !== "全部來源" ? `來源：${state.platform}` : "",
+        state.confidence !== "全部信心" ? `信心：${state.confidence}` : "",
+        state.time !== "全部時間" ? `時間：${state.time}` : "",
+        state.sort !== "latest" ? `排序：${sortFilter.options[sortFilter.selectedIndex].text}` : ""
+      ].filter(Boolean);
+      activeFilters.innerHTML = activeItems.length
+        ? activeItems.map((item) => `<span>${item}</span>`).join("")
+        : "<span>目前未套用進階條件。</span>";
+      emptyState.hidden = filtered.length !== 0;
+      listGrid.innerHTML = pageRecords
+        .map((item, index) => renderCard(item, start + index + 1))
+        .join("");
+      renderPagination(totalPages);
+      updateUrl();
+    }
+
+    searchInput.addEventListener("input", (event) => {
+      state.keyword = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    useCaseFilter.addEventListener("change", (event) => {
+      state.useCase = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    topicFilter.addEventListener("change", (event) => {
+      state.topic = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    sortFilter.addEventListener("change", (event) => {
+      state.sort = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    platformFilter.addEventListener("change", (event) => {
+      state.platform = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    confidenceFilter.addEventListener("change", (event) => {
+      state.confidence = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    timeFilter.addEventListener("change", (event) => {
+      state.time = event.target.value;
+      state.page = 1;
+      render();
+    });
+
+    clearFiltersButton.addEventListener("click", () => {
+      state.keyword = "";
+      state.useCase = "全部用途";
+      state.topic = "全部主題";
+      state.sort = "latest";
+      state.platform = "全部來源";
+      state.confidence = "全部信心";
+      state.time = "全部時間";
+      state.page = 1;
+      populateFilters();
+      render();
+    });
+
+    populateFilters();
+    render();
+  </script>
+</body>
+</html>

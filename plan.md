@@ -1,52 +1,198 @@
-# 專案計劃書
+# 靈感收藏庫升級計劃書
 
-## 基本資訊
-- 專案名稱：My_KeepEvery（靈感收藏盒 InspirationBox）
-- 建立日期：2026-04-26
-- 負責人：Tulip
-- 狀態：[ ] 規劃中 / [x] 進行中 / [ ] 完成
+> **For agentic workers:** 建議實作時使用 `superpowers:subagent-driven-development` or `superpowers:executing-plans` 逐 task 執行。本文使用 checkbox 語法追蹤進度。
 
-## 專案概況
-透過 LINE 收藏靈感，Gemini AI 自動標籤分類，寫入 Google Sheets 歸檔，並用 Next.js 儀表板瀏覽所有收藏內容。
+**Goal:** 將 `My_KeepEvery` 從偏向「收得到、但用不起來」的收藏流程，升級成能快速理解、有效找回、逐步再利用的「靈感收藏庫」。
 
-- **使用者**：Tulip 個人使用
-- **核心功能**：LINE 收藏 → AI 標籤 → Sheets 歸檔 → 儀表板呈現
-- **目前版本**：0.1.0，開發中
+**Architecture:** 保留既有 LINE webhook、Gemini 串接、Google Sheets 與 Next.js 專案骨架，重做內容解析流程、收藏資料模型與首頁使用體驗。第一階段先讓純文字、社群 URL、一般 URL 都能穩定產出摘要、用途分類、標籤與信心等級，再先以隔離式 demo 頁驗證新版首頁資訊架構與搜尋流程，確認方向後才逐步接回正式流程與首頁。
 
-## 目標與背景
-在 LINE 隨手傳文字或連結，Gemini AI 自動幫你貼標籤，同步寫進 Google Sheets，用 Next.js 儀表板瀏覽所有靈感。
+**Tech Stack:** Next.js 16、React 19、Google Gemini 2.5 Flash、Google Sheets via Apps Script、LINE Messaging API、Tailwind CSS v4、Framer Motion
 
-## 資源評估
-| 項目 | 說明 |
-|---|---|
-| 使用工具 | Next.js 16、Tailwind CSS v4、Framer Motion |
-| 外部 API / 服務 | Google Gemini 1.5 Flash、Google Sheets（Apps Script）、LINE Messaging API |
-| 部署 | Docker + Google Cloud Run |
+---
 
-## 實作步驟
-- [x] 建立 Next.js 專案架構
-- [x] 串接 LINE Webhook
-- [x] 串接 Google Gemini AI 標籤
-- [x] 串接 Google Sheets 歸檔
-- [ ] 完成前端儀表板 UI
-- [ ] Docker 打包與 Cloud Run 部署
-- [ ] 測試完整流程
+## 一、這次升級的核心結論
 
-## 當前進度備註
-> 切換工具前在這裡更新，讓下一個 AI 接得住
+- 專案不重建新 repo，直接在現有 `My_KeepEvery` 上做中度偏重構的產品升級。
+- 新定位改為「靈感收藏庫」。
+- 內容以 AI 相關收藏為主，但保留非 AI 資訊的收納彈性。
+- 優先順序不是先美化畫面，而是先解決「內容太空、回找困難」。
+- 第一階段主軸：`內容解析層 -> 混合型摘要 -> demo 驗證 -> 搜尋/篩選 -> 新首頁 layout`
+- 正式首頁與正式資料流改動前，必須先完成可獨立驗證的 demo 頁，避免直接把線上版本改壞。
 
-- **最後更新**：2026-04-26
-- **使用工具**：Claude Code
-- **做到哪裡**：後端串接完成（LINE Webhook、Gemini 標籤、Sheets 歸檔），前端儀表板尚未完成
-- **下一步**：完成前端儀表板 UI，接著 Docker 打包
-- **注意事項**：Gemini 1.5 已停用，需確認目前使用的模型版本
+## 二、現況判斷
 
-## 已知風險 / 注意事項
-- Next.js 16 為較新版本，API 與文件結構和訓練資料不同，改動前先查 `node_modules/next/dist/docs/`
-- Gemini API 有用量限制，需注意 rate limit
-- LINE Webhook 需要 HTTPS endpoint，本地開發需用 ngrok 或 Cloud Run 測試
+### 已有可沿用基礎
 
-## 完成定義（Done Criteria）
-- 從 LINE 傳入訊息後，能在儀表板上看到已標籤的靈感卡片
-- 資料同步寫入 Google Sheets
-- Cloud Run 部署成功，公開可存取
+- LINE 收藏入口已可用。
+- webhook 骨架已可區分文字與 URL。
+- Gemini 串接已存在，但目前主要用於標籤生成。
+- Google Sheets 寫入與讀取流程已存在.
+- Next.js 前端已有基本首頁、搜尋與展示容器。
+
+### 目前主要問題
+
+- 收藏內容進來後資訊量不足，AI 常只能憑標題猜內容。
+- 社群 URL 解析常抓不到可用正文或有效預覽。
+- 首頁 layout 偏展示型，不利於搜尋、比較與回找。
+- 現有資料欄位比較像 append 紀錄，不像可再利用的收藏單位。
+- 文件敘事仍停留在舊版「靈感收藏盒」定位。
+
+## 三、第一階段產品目標
+
+### 產品定位
+
+- 名稱方向：`靈感收藏庫`
+- 核心價值：讓每筆收藏能被快速理解、有效找回，並逐步累積成個人可再利用的內容資產。
+
+### 首頁體驗方向
+
+- 改為混合式 layout。
+- 預設清單檢視，支援切換卡片檢視。
+- 每筆資料第一層資訊以 `一句摘要 / 用途分類 / 原始標題 / 標籤` 為主。
+
+### 第一階段資料欄位 MVP
+
+- `id`
+- `input_type`
+- `raw_input`
+- `source_title`
+- `source_url`
+- `created_at`
+- `source_platform`
+- `content_type`
+- `summary`
+- `key_points`
+- `tags`
+- `use_case`
+- `topic_category`
+- `confidence_level`
+- `parse_status`
+
+## 四、避免把現在線上改壞的策略
+
+- 先做隔離式 demo，不直接覆蓋現有首頁或正式資料流。
+- demo 頁使用獨立 route、獨立元件或 mock/轉接資料，不與現行首頁共用未穩定的新邏輯。
+- 新欄位與新解析流程先以向後相容方式設計，避免舊資料立即失效。
+- 在 demo 未確認前，不替換正式首頁預設入口，不移除舊欄位依賴。
+- 每一階段都先做本地 smoke test，再決定是否進入下一階段整併。
+- 若未來要部署 preview 或正式版，必須以「先驗證 demo / preview，再切正式」為原則，不直接在既有線上頁面硬改。
+
+## 五、建議先做哪一個
+
+**建議最先開始的 task：`T01 產品與資料模型定稿`**
+
+原因：
+
+- 它決定後續 AI prompt、Google Sheets 欄位、首頁欄位、搜尋邏輯會用到哪些欄位。
+- If 先改解析流程或前端 layout，之後很容易因欄位名稱或資料結構改動而重工。
+- 這個 task 成本低、風險低，但會大幅降低後續實作歧義。
+
+## 六、最小可執行 Task 清單
+
+### T01 產品與資料模型定稿
+
+- [x] **目標與完成條件**
+  - 目標：把「靈感收藏庫」第一階段的產品定位、輸入類型、資料欄位與狀態定義寫清楚，作為後續實作唯一依據。
+  - 完成條件：
+    - `PRD.md` 更新為新定位與第一階段範圍。
+    - `TECH_DOC.md` 更新為新版資料欄位與三種輸入流程。
+    - 明確定義 `summary / key_points / use_case / topic_category / confidence_level / parse_status` 的欄位語意。
+- [x] **依賴或前置順序**
+  - 無前置，為全計劃起點。
+- [x] **建議**
+  - 第一個執行。
+
+### T02 現有資料流與檔案責任盤點
+
+- [x] **目標與完成條件**
+  - 目標：把現有 webhook、extractor、Gemini、Sheets、首頁與元件責任盤點清楚，確認哪些沿用、哪些重寫。
+  - 完成條件：
+    - 列出需要修改的核心檔案清單。
+    - 標記每個檔案未來責任，例如「內容解析」、「AI 整理」、「資料讀寫」、「首頁檢視」。
+    - 在 `TECH_DOC.md` 或 `docs/log.md` 留下盤點結論。
+- [x] **依賴或前置順序**
+  - 依賴 `T01`，以新版欄位模型為準。
+- [x] **建議**
+  - 早期執行，避免進入實作後才發現責任切不清。
+
+### T03 Google Sheets 欄位升級設計
+
+- [x] **目標與完成條件**
+  - 目標：把目前偏 append log 的 Sheets 結構，升級成可支撐摘要、分類、信心等級與搜尋的收藏結構。
+  - 完成條件：
+    - 定義新版工作表欄位順序。
+    - 決定舊資料相容策略，是留空、補值還是只套用新資料。
+    - 更新 `src/lib/sheets.ts` 對應的資料介面規格設計。
+- [x] **依賴或前置順序**
+  - 依賴 `T01`。
+  - 建議在 `T04`、`T05` 前完成，因為後續輸出都要落到這個 schema。
+- [x] **建議**
+  - 優先級高。
+
+### T04 Demo 網頁規格與隔離式驗證頁製作
+
+- [x] **目標與完成條件**
+  - 目標：先做一個不影響現行線上首頁的新版 demo 頁，用來驗證「靈感收藏庫」首頁資訊架構、欄位呈現方式與搜尋/篩選方向。
+  - 完成條件：
+    - 建立隔離式 demo，不直接覆蓋現有首頁。
+    - demo 先以純 HTML 多頁結構驗證，不依賴 Next.js dev server。
+    - 首頁顯示最新 8 筆收藏，負責驗證第一層摘要資訊、輕量工具列與用途入口。
+    - 列表頁支援分類篩選、關鍵字搜尋與每頁 10 筆分頁。
+    - 點擊「高品質 AI 整理」的數字，確認能跳轉至 `/list?confidence=high` 且列表僅顯示 high 信心靈感。
+    - 點擊「部分解析與歸檔」數字，確認能跳轉至 `/list?parse_status=partial` 且列表僅顯示 partial 狀�## 十一、目前狀態
+
+- 狀態：`已完成全站靈感編輯功能（對接 Google Sheets）、修改分頁器文字與標題字重，並修復了 react-hooks 相關 ESLint 警告，專案建置完全成功`
+- 最後更新：`2026-06-23`
+- 本次已完成：
+  - **靈感編輯儲存至 Google Sheets (Excel)**：
+    - 在 Google Apps Script `程式碼.js` 中擴充支援 `action === "update_row"`。
+    - 在 Next.js 端建立 `/api/inspiration/update`。
+    - 建立 Neobrutalist 風格的 `EditInspirationModal.tsx` 視窗元件。
+    - 修改首頁、所有列表頁與單文詳細頁，將 records 資料改用 client-side `useState` 管理，在 Context Menu 整合編輯選單，成功後即時在前端 UI 反映，免重啟重載頁面。
+  - **樣式與文字微調**：
+    - 將首頁及列表頁表格的「摘要主標題」字重從 `700` 調降為 `500`，實現「列表跟首頁列表的標題不要加粗」需求。
+    - 修改列表頁分頁器按鈕文字為 `« 最前頁` 與 `最後頁 »`。
+    - 將首頁左上的標題「控制台概覽」修改為「首頁」。
+  - **專案強固性優化**：
+    - 修復了 `react-hooks/set-state-in-effect` 造成的編譯失敗，全數改為 render 階段同步 props 狀態。
+    - 透過 `clasp push` 與 `clasp deploy` 將 GAS 變更同步至雲端，完美更新現有 deployment。
+- 目前尚未完成：
+  - 無 (所有優化與新增需求已全數完成)
+- 建議下一步：
+  - 供使用者測試編輯修改與分頁功能，若無其他需求則完成本次對話。
+
+## 十二、接手摘要
+
+### 已完成
+
+- `編輯與儲存回 Excel` 已完成：Apps Script、Next.js API、前端 Edit Modal 以及首頁、列表、詳情三頁面的狀態整合已全數開發並部署完成。
+- `分頁文字與標題字重微調` 已完成：`« 最前頁`、`最後頁 »` 與非粗體摘要標題已上線。
+- `T01` 已完成：`PRD.md`、`TECH_DOC.md` 已改為「靈感收藏庫」正式敘事。
+- `T02` 已完成：現有核心檔案責任、沿用骨架與優先重構區塊已盤點完成。
+- `T03` 已完成：Google Sheets 新版 15 欄 schema、舊資料相容策略與 `src/lib/sheets.ts` 未來資料介面已定稿。
+- `T04` 已完成：已改為純 HTML 多頁 demo。
+- `T05` 已完成：純文字輸入整理流程已升級，GAS 自動部署完成，端到端測試通過。
+- `T06` 已完成：社群 URL 內容解析管線與 Webhook 分流實作完成。
+- `T07` 已完成：一般 URL 內容解析層與專用 AI 整理器實作完成，Web 網址收藏已完全切換至 V2 流程。
+- `T08` 已完成：Webhook 三分支代碼重構合流完成，消除所有核心檔案 unused 警告，統一推播回覆重點。
+- `T09 & T10` 已完成：在 Next.js 前端成功建立隔離 Demo 路由並對接 library_v2 資料，實作了搜尋、過濾、排序與分頁。
+- `T11` 已完成：批次舊資料清洗腳本已在背景運行，採用 4.5 秒延遲及指數退避重試解決 429 頻率限制。
+- `T12` 已完成：前端 Demo 路由成功轉正，替換正式首頁並打通 `/list` 與 `/detail` 路由。舊資源與隔離目錄已完全清理。
+- `T13` 已完成：正式路由整合後的產品規格與技術架構細節已收斂回寫至 `PRD.md` 與 `TECH_DOC.md`，完成 Phase 2 的文件收斂。
+- `手機版 RWD 修復` 已完成：已全域引入 layout 樣式，強固抽屜隱藏（`!important`）並為 `main-content` 加上防禦性高度與滾動約束。
+
+### 當前共識
+
+- 第一階段先做 `demo 先行`，不能直接覆蓋現有首頁或正式資料流。
+- 新版首頁第一層資訊固定以：
+  - `一句摘要`
+  - `用途分類`
+  - `原始標題`
+  - `標籤`
+- 社群與一般 URL 抓不到完整內容時，不丟棄，採低信心或部分解析收錄。
+- 舊資料批次清洗遷移正在安全進行中，新舊資料在 library_v2 統一收斂。
+- 舊的 `appendToSheet` 寫入舊工作表流程已在 T08 中完全清除，保證單一資料落點。
+
+### 下一步
+
+- 下一個正式起點為「第一階段升級上線後的專案維護與行動端回饋優化，或正式部署」。

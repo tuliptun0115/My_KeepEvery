@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>靈感收藏庫</title>
+  <link rel="stylesheet" href="./library-styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="cloud-wrap cloud-a" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="cloud-wrap cloud-b" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+    <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+    <main class="frame">
+      <section class="hero">
+        <div class="hero-main">
+          <div class="title-sticker">
+            <h1>靈感收藏庫</h1>
+          </div>
+          <p class="hero-copy">
+            讓每筆收藏能被快速理解、有效找回，並逐步累積成可再利用的個人內容資產。
+          </p>
+          <div id="hero-stats" class="hero-stats"></div>
+        </div>
+      </section>
+
+      <section class="notice toolbar-panel">
+        <form id="home-search-form" class="toolbar-row toolbar-home-row">
+          <label class="search toolbar-search" for="home-search-input">
+            <input
+              id="home-search-input"
+              type="search"
+              placeholder="搜尋摘要、標題、標籤或重點"
+            />
+          </label>
+          <select id="home-use-case-filter" class="filter-select"></select>
+          <select id="home-topic-filter" class="filter-select"></select>
+          <a id="search-all-link" class="link-button accent-button search-all-link" href="./list.html">查詢</a>
+        </form>
+        <div class="quick-use">
+          <div class="quick-use-label">用途入口：</div>
+          <div id="quick-use-menu" class="quick-use-menu"></div>
+        </div>
+      </section>
+
+      <section class="results">
+        <div class="section-head">
+          <div class="section-title">最新收藏</div>
+        </div>
+        <div class="section-meta-row">
+          <div id="result-count" class="section-subtitle">目前顯示 0 / 0 筆收藏。</div>
+          <a class="text-action section-action section-action-large" href="./list.html">看更多收藏</a>
+        </div>
+        <div id="home-grid" class="home-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./library-data.js"></script>
+  <script>
+    const homeGrid = document.getElementById("home-grid");
+    const resultCount = document.getElementById("result-count");
+    const heroStats = document.getElementById("hero-stats");
+    const quickUseMenu = document.getElementById("quick-use-menu");
+    const homeSearchInput = document.getElementById("home-search-input");
+    const homeSearchForm = document.getElementById("home-search-form");
+    const homeUseCaseFilter = document.getElementById("home-use-case-filter");
+    const homeTopicFilter = document.getElementById("home-topic-filter");
+    const searchAllLink = document.getElementById("search-all-link");
+
+    const orderedRecords = getOrderedRecords();
+    const HOME_LATEST_LIMIT = 10;
+    const latestRecords = orderedRecords.slice(0, HOME_LATEST_LIMIT);
+    const highCount = orderedRecords.filter((item) => item.confidence_level === "high").length;
+    const partialCount = orderedRecords.filter((item) => item.parse_status === "partial").length;
+
+    function renderTags(tags) {
+      return tags.slice(0, 4).map((tag) => `<span class="tag">#${tag}</span>`).join("");
+    }
+
+    function renderHomeCard(item, index, total) {
+      return `
+        <a class="record compact-record record-link" href="./detail.html?id=${encodeURIComponent(item.id)}">
+          <div class="compact-main">
+            <div class="record-top compact-top">
+              <div class="compact-meta">
+                <span class="record-number">${String(index + 1).padStart(2, "0")}</span>
+                <span class="chip">${item.use_case}</span>
+                <span class="chip topic">${item.topic_category}</span>
+              </div>
+              <span class="record-time">${item.created_at}</span>
+            </div>
+            <div class="summary compact-summary">${item.summary}</div>
+            <div class="title compact-title">${item.source_title}</div>
+          </div>
+          <div class="compact-side">
+            <div class="tags compact-tags">${renderTags(item.tags)}</div>
+            <div class="record-actions compact-actions">
+              <span class="link-button subtle-button faux-button">查看內容</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderQuickUse() {
+      const useCases = getUseCases();
+      quickUseMenu.innerHTML = useCases
+        .map((useCase) => `<a class="quick-use-item" href="./list.html?use_case=${encodeURIComponent(useCase)}">${useCase}</a>`)
+        .join("");
+    }
+
+    function populateHomeFilters() {
+      const useCaseOptions = ["全部用途", ...getUseCases()];
+      const topicOptions = ["全部主題", ...getTopicCategories()];
+      homeUseCaseFilter.innerHTML = useCaseOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      homeTopicFilter.innerHTML = topicOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
+      homeUseCaseFilter.value = "全部用途";
+      homeTopicFilter.value = "全部主題";
+    }
+
+    function matchesKeyword(item, keyword) {
+      const normalizedKeyword = keyword.trim().toLowerCase();
+      const haystack = [
+        item.summary,
+        item.source_title,
+        item.use_case,
+        item.topic_category,
+        ...(item.tags || []),
+        ...(item.key_points || [])
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return !normalizedKeyword || haystack.includes(normalizedKeyword);
+    }
+
+    function updateSearchLink(keyword, useCase, topic) {
+      const nextParams = new URLSearchParams();
+      const trimmedKeyword = keyword.trim();
+      if (trimmedKeyword) nextParams.set("keyword", trimmedKeyword);
+      if (useCase !== "全部用途") nextParams.set("use_case", useCase);
+      if (topic !== "全部主題") nextParams.set("topic", topic);
+      const query = nextParams.toString();
+      searchAllLink.href = query ? `./list.html?${query}` : "./list.html";
+    }
+
+    function renderHome() {
+      const keyword = homeSearchInput.value || "";
+      const useCase = homeUseCaseFilter.value || "全部用途";
+      const topic = homeTopicFilter.value || "全部主題";
+      const filteredRecords = latestRecords.filter((item) => {
+        const hitKeyword = matchesKeyword(item, keyword);
+        const hitUseCase = useCase === "全部用途" || item.use_case === useCase;
+        const hitTopic = topic === "全部主題" || item.topic_category === topic;
+        return hitKeyword && hitUseCase && hitTopic;
+      });
+      const shownCount = filteredRecords.length;
+      const activeBits = [
+        keyword.trim() ? `關鍵字「${keyword.trim()}」` : "",
+        useCase !== "全部用途" ? `用途「${useCase}」` : "",
+        topic !== "全部主題" ? `主題「${topic}」` : ""
+      ].filter(Boolean);
+      const summaryLabel = activeBits.length
+        ? `最新 ${HOME_LATEST_LIMIT} 筆中找到 ${shownCount} 筆符合 ${activeBits.join("、")}`
+        : `目前顯示最新 ${shownCount} / ${orderedRecords.length} 筆收藏。`;
+
+      resultCount.textContent = summaryLabel;
+      heroStats.innerHTML = `
+        <span>收藏總數 ${orderedRecords.length}</span>
+        <span>高信心內容 ${highCount}</span>
+        <span>部分解析 ${partialCount}</span>
+        <span>最新更新 ${orderedRecords[0].created_at}</span>
+      `;
+      homeGrid.innerHTML = filteredRecords.length
+        ? filteredRecords.map((item, index) => renderHomeCard(item, index, filteredRecords.length)).join("")
+        : `<div class="empty">最新 ${HOME_LATEST_LIMIT} 筆裡暫時找不到符合關鍵字的收藏，建議改到完整列表頁繼續查找。</div>`;
+      updateSearchLink(keyword, useCase, topic);
+    }
+
+    homeSearchInput.addEventListener("input", renderHome);
+    homeUseCaseFilter.addEventListener("change", renderHome);
+    homeTopicFilter.addEventListener("change", renderHome);
+
+    homeSearchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      window.location.href = searchAllLink.href;
+    });
+
+    populateHomeFilters();
+    renderHome();
+    renderQuickUse();
+  </script>
+</body>
+</html>

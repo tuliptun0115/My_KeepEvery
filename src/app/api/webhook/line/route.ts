@@ -1,8 +1,235 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignature, replyMessage, pushMessage } from "@/lib/line";
-import { extractTitle } from "@/lib/extractor";
-import { generateInspirationTags } from "@/lib/gemini";
-import { appendToSheet } from "@/lib/sheets";
+import { extractSocialContent, extractGeneralContent } from "@/lib/extractor";
+import { organizeTextInspiration, organizeSocialInspiration, organizeGeneralInspiration } from "@/lib/gemini";
+import { appendToLibraryV2 } from "@/lib/sheets";
+
+function truncateSourceTitle(text: string, maxLength: number = 60): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength).trim()}...`;
+}
+
+function getTaipeiTimestamp(): string {
+  return new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
+}
+
+function extractFirstUrl(text: string): string | null {
+  const urlMatch = text.match(/(https?:\/\/[^\s]+)/g);
+  return urlMatch ? urlMatch[0] : null;
+}
+
+const SOCIAL_DOMAINS = [
+  "facebook.com",
+  "instagram.com",
+  "threads.net",
+  "threads.com",
+  "x.com",
+  "twitter.com",
+  "linkedin.com",
+];
+
+function isSocialUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return SOCIAL_DOMAINS.some((domain) => hostname.includes(domain));
+  } catch {
+    return false;
+  }
+}
+
+function formatReplyMessage(
+  type: string,
+  source: string,
+  title: string,
+  summary: string,
+  keyPoints: string[],
+  tags: string[],
+  parseStatus: "complete" | "partial",
+  confidenceLevel: "high" | "medium" | "low"
+): string {
+  const statusEmoji = parseStatus === "complete" ? "✅" : "⚠️";
+  const confidenceStr =
+    confidenceLevel === "low"
+      ? " (低信心)"
+      : confidenceLevel === "medium"
+      ? " (中等信心)"
+      : " (高信心)";
+
+  let msg = `📥 靈感已收錄至 library_v2！\n\n`;
+  msg += `【類型】${type}\n`;
+  msg += `【來源】${source}\n`;
+  msg += `【標題】${title}\n`;
+  msg += `【摘要】${summary}\n`;
+
+  if (keyPoints && keyPoints.length > 0) {
+    msg += `【重點】\n`;
+    keyPoints.forEach((kp) => {
+      msg += `• ${kp}\n`;
+    });
+  }
+
+  msg += `【標籤】${tags.join(" ")}\n`;
+  msg += `【狀態】${parseStatus}${statusEmoji}${confidenceStr}`;
+
+  return msg;
+}
+
+async function handleUrlMessage(
+  text: string,
+  replyToken: string,
+  userId?: string
+) {
+  const url = extractFirstUrl(text);
+  if (!url) {
+    return;
+  }
+
+  const surroundingText = text.replace(url, "").trim();
+  const isSocial = isSocialUrl(url);
+
+  if (isSocial) {
+    console.log(`[Webhook] 開始處理社群 URL: ${url}`);
+    await replyMessage(replyToken, "🌟 偵測到社群靈感連結，正在捕捉中...");
+  } else {
+    console.log(`[Webhook] 開始處理一般 URL: ${url}`);
+    await replyMessage(replyToken, "🌟 偵測到網頁靈感連結，正在捕捉中...");
+  }
+
+  try {
+    let extractResult;
+    let organized;
+    let input_type: "social_url" | "url";
+    let content_type: "post" | "article";
+    let typeName: string;
+
+    if (isSocial) {
+      extractResult = await extractSocialContent(url);
+      input_type = "social_url";
+      content_type = "post";
+      typeName = "社群靈感";
+      organized = await organizeSocialInspiration(
+        extractResult.title,
+        extractResult.description,
+        url,
+        extractResult.platform,
+        surroundingText
+      );
+    } else {
+      extractResult = await extractGeneralContent(url);
+      input_type = "url";
+      content_type = "article";
+      typeName = "網頁靈感";
+      organized = await organizeGeneralInspiration(
+        extractResult.title,
+        extractResult.description,
+        extractResult.content,
+        url,
+        surroundingText
+      );
+    }
+
+    // 信心等級加權
+    let confidence_level = extractResult.confidence_level;
+    if (surroundingText && confidence_level === "low") {
+      confidence_level = "medium";
+    }
+
+    // 寫入 library_v2
+    await appendToLibraryV2({
+      id: crypto.randomUUID(),
+      input_type,
+      raw_input: text,
+      source_title: extractResult.title,
+      source_url: url,
+      created_at: getTaipeiTimestamp(),
+      source_platform: extractResult.platform,
+      content_type,
+      summary: organized.summary,
+      key_points: organized.key_points,
+      tags: organized.tags,
+      use_case: organized.use_case,
+      topic_category: organized.topic_category,
+      confidence_level,
+      parse_status: extractResult.parse_status,
+    });
+
+    if (userId) {
+      const replyMsg = formatReplyMessage(
+        typeName,
+        extractResult.platform,
+        extractResult.title,
+        organized.summary,
+        organized.key_points,
+        organized.tags,
+        extractResult.parse_status,
+        confidence_level
+      );
+      await pushMessage(userId, replyMsg);
+    }
+  } catch (err) {
+    console.error(`[Webhook] URL 處理失敗:`, err);
+    if (userId) {
+      const errorMsg = isSocial
+        ? "❌ 社群連結收藏失敗，請稍後再試。"
+        : "❌ 網頁連結收藏失敗，請稍後再試。";
+      await pushMessage(userId, errorMsg);
+    }
+  }
+}
+
+async function handleTextMessage(
+  text: string,
+  replyToken: string,
+  userId?: string
+) {
+  await replyMessage(replyToken, "📝 正在整理您的文字內容並寫入靈感收藏庫...");
+
+  try {
+    const organized = await organizeTextInspiration(text);
+    const title = truncateSourceTitle(text);
+
+    await appendToLibraryV2({
+      id: crypto.randomUUID(),
+      input_type: "text",
+      raw_input: text,
+      source_title: title,
+      source_url: "",
+      created_at: getTaipeiTimestamp(),
+      source_platform: "LINE 文字",
+      content_type: "note",
+      summary: organized.summary,
+      key_points: organized.key_points,
+      tags: organized.tags,
+      use_case: organized.use_case,
+      topic_category: organized.topic_category,
+      confidence_level: "high",
+      parse_status: "complete",
+    });
+
+    if (userId) {
+      const replyMsg = formatReplyMessage(
+        "文字靈感",
+        "LINE 文字",
+        title,
+        organized.summary,
+        organized.key_points,
+        organized.tags,
+        "complete",
+        "high"
+      );
+      await pushMessage(userId, replyMsg);
+    }
+  } catch (err) {
+    console.error("[Webhook] 文字處理失敗:", err);
+    if (userId) {
+      await pushMessage(userId, "❌ 文字收藏失敗，請稍後再試。");
+    }
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,93 +248,15 @@ export async function POST(req: NextRequest) {
       if (event.type === "message" && event.message.type === "text") {
         const text = event.message.text.trim();
         const replyToken = event.replyToken;
+        const userId = event.source.userId;
 
         // 2. 檢測是否為 URL (支援文字收藏或 URL 收藏)
-        const urlMatch = text.match(/(https?:\/\/[^\s]+)/g);
+        const url = extractFirstUrl(text);
         
-        if (urlMatch) {
-          const url = urlMatch[0];
-          // 擷取網址以外的任何使用者附帶中文字
-          const surroundingText = text.replace(url, "").trim();
-
-          console.log(`[Webhook] 開始處理 URL: ${url}`);
-          await replyMessage(replyToken, "🌟 偵測到靈感連結，正在捕捉中...");
-
-          try {
-            // 核心處理流程
-            console.log(`[Webhook] 提取標題中...`);
-            let title = await extractTitle(url);
-            
-            // 如果爬蟲失敗（回傳 fallback 文字），且使用者有附帶備註文字，以使用者的文字為主
-            const isFallbackTitle = title.startsWith("來自 ") || title === "無法提取標題" || title.includes("Log in");
-            if (surroundingText && isFallbackTitle) {
-              console.log(`[Webhook] 爬蟲可能遭擋，改用使用者附加文字作為標題: ${surroundingText}`);
-              title = surroundingText;
-            }
-
-            console.log(`[Webhook] 生成 AI 標籤中... (附帶使用者文字)`);
-            // 把網頁標題與使用者打的字混在一起丟給 AI，給他最大量的判斷情報
-            const aiContent = surroundingText ? `[原標題: ${title}] 使用者備註: ${surroundingText}` : title;
-            const geminiResult = await generateInspirationTags(aiContent, url);
-            const tags = geminiResult.tags;
-            
-            // 如果 Gemini 有查出真正的標題，我們就把它換回去！(完美解決 FB/IG 沒文案也沒標題的狀況)
-            if (geminiResult.real_title) {
-              console.log(`[Webhook] Gemini 利用搜尋找回了真實標題：${geminiResult.real_title}`);
-              title = geminiResult.real_title;
-            }
-
-            const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-            
-            console.log(`[Webhook] 寫入 Google Sheets 中...`);
-            await appendToSheet({
-              time,
-              title,
-              tags,
-              source: url
-            });
-
-            console.log(`[Webhook] 全部完成，發送 Push Message 通知`);
-            // 推送成功訊息 (因為 replyToken 只能用一次，所以這裡用 pushMessage)
-            // 註：這需要知道 userId，我們從 event 取得
-            const userId = event.source.userId;
-            if (userId) {
-              await pushMessage(userId, `✅ 靈感已收藏！\n\n📌 標題：${title}\n🏷️ 標籤：${tags.join(" ")}`);
-            }
-          } catch (err) {
-            console.error("[Webhook] URL 處理失敗:", err);
-            const userId = event.source.userId;
-            if (userId) {
-              await pushMessage(userId, `❌ 收藏失敗：網路連線逾時或 API 錯誤。\n請確認試算表權限與 Gemini 金鑰。`);
-            }
-          }
+        if (url) {
+          await handleUrlMessage(text, replyToken, userId);
         } else {
-          // 純文字收藏
-          await replyMessage(replyToken, "📝 正在將您的文字紀錄到靈感收藏盒...");
-          
-          try {
-            const geminiResult = await generateInspirationTags(text);
-            const tags = geminiResult.tags;
-            const time = new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
-            
-            await appendToSheet({
-              time,
-              title: text,
-              tags,
-              source: "LINE 文字訊息"
-            });
-
-            const userId = event.source.userId;
-            if (userId) {
-              await pushMessage(userId, `✅ 文字靈感已收藏！\n🏷️ AI 標籤：${tags.join(" ")}`);
-            }
-          } catch (err) {
-            console.error("[Webhook] 文字處理失敗:", err);
-            const userId = event.source.userId;
-            if (userId) {
-              await pushMessage(userId, `❌ 文字收藏失敗，請稍後再試。`);
-            }
-          }
+          await handleTextMessage(text, replyToken, userId);
         }
       }
     }

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./library.css";
+import { Sidebar } from "@/components/Sidebar";
+import { fetchFromLibraryV2 } from "@/lib/sheets";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,25 +16,38 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "靈感收藏盒 - 抓住每一閃現的靈感",
-  description: "一款專為靈感打造的輕量化收藏工具",
+  title: "靈感收藏庫 - 概覽控制台",
+  description: "一款專為靈感與知識打造的輕量化收藏工具",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
   },
 };
 
-export default function RootLayout({
+export const dynamic = 'force-dynamic';
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 全站 Server-side 撈取主題，以動態渲染常駐側邊欄
+  const records = await fetchFromLibraryV2();
+  const topicCategories = Array.from(
+    new Set(records.map((r) => r.topic_category).filter(Boolean))
+  );
+
   return (
     <html
-      lang="en"
+      lang="zh-TW"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full flex overflow-hidden bg-[#fafafa]">
+        <Sidebar topicCategories={topicCategories} totalCount={records.length} />
+        <div className="main-content flex-1 overflow-y-auto min-w-0 relative">
+          {children}
+        </div>
+      </body>
     </html>
   );
 }

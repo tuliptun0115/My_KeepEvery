@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>收藏內容</title>
+  <link rel="stylesheet" href="./library-styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="cloud-wrap cloud-a" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="cloud-wrap cloud-b" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+    </div>
+    <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+    <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+    <main class="frame">
+      <section class="hero">
+        <div class="hero-main">
+          <a class="nav-pill" href="./library-demo.html">回首頁</a>
+          <div class="title-sticker">
+            <h1>收藏內容</h1>
+          </div>
+          <p class="hero-copy">閱讀單筆內容，並可切換上一則 / 下一則。</p>
+        </div>
+      </section>
+
+      <section class="results">
+        <div id="detail-layout" class="detail-layout"></div>
+        <div id="detail-empty" class="empty" hidden>找不到這筆收藏。</div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./library-data.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const orderedRecords = getOrderedRecords();
+    const record = id ? getRecordById(id) : orderedRecords[0];
+    const detailLayout = document.getElementById("detail-layout");
+    const detailEmpty = document.getElementById("detail-empty");
+
+    function renderTags(tags) {
+      return tags.map((tag) => `<span class="tag">#${tag}</span>`).join("");
+    }
+
+    function renderPoints(points) {
+      return points.map((point) => `<li>${point}</li>`).join("");
+    }
+
+    if (!record) {
+      detailEmpty.hidden = false;
+    } else {
+      const index = getRecordIndexById(record.id, orderedRecords);
+      const prevRecord = index < orderedRecords.length - 1 ? orderedRecords[index + 1] : null;
+      const nextRecord = index > 0 ? orderedRecords[index - 1] : null;
+      const serial = String(index + 1).padStart(2, "0");
+
+      detailLayout.innerHTML = `
+        <article class="record">
+          <div class="record-top">
+            <span class="record-number">${serial}</span>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
+              <span class="record-time">${record.created_at}</span>
+              <a class="link-button" href="./list.html">回收藏列表</a>
+            </div>
+          </div>
+          <div class="summary">${record.summary}</div>
+          <div class="meta-row">
+            <span class="chip">${record.use_case}</span>
+            <span class="chip topic">${record.topic_category}</span>
+            <span class="chip topic">${record.source_platform}</span>
+          </div>
+          <div class="title">${record.source_title}</div>
+          <div class="tags">${renderTags(record.tags)}</div>
+          <div class="detail-panel">
+            <div class="detail-label">2-3 個重點</div>
+            <ul class="points">${renderPoints(record.key_points)}</ul>
+          </div>
+          <div class="detail-panel">
+            <div class="detail-label">原始內容</div>
+            <p class="detail-full">${record.raw_input || "這筆收藏沒有額外原始文字。"} </p>
+            ${record.source_url ? `<p class="detail-full"><a class="link-button" href="${record.source_url}" target="_blank" rel="noreferrer">查看來源</a></p>` : ""}
+          </div>
+          <div class="detail-nav">
+            ${prevRecord ? `<a href="./detail.html?id=${encodeURIComponent(prevRecord.id)}">上一筆</a>` : ""}
+            ${nextRecord ? `<a href="./detail.html?id=${encodeURIComponent(nextRecord.id)}">下一筆</a>` : ""}
+          </div>
+        </article>
+      `;
+    }
+  </script>
+</body>
+</html>

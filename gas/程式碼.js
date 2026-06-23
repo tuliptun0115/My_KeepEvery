@@ -91,6 +91,44 @@ function doGet(e) {
     return ContentService.createTextOutput("Unauthorized").setStatusCode(401);
   }
 
+  // 判斷是否要求新版 library_v2
+  if (e.parameter.sheet_name === LIBRARY_V2_SHEET_NAME) {
+    var libraryV2Sheet = getOrCreateSheetByName(LIBRARY_V2_SHEET_NAME);
+    ensureLibraryV2Headers(libraryV2Sheet);
+    var data = libraryV2Sheet.getDataRange().getValues();
+    
+    // 若分頁為空 (僅標題或全空)
+    if (data.length <= 1) {
+      return ContentService.createTextOutput(JSON.stringify([]))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var jsonData = [];
+    for (var i = 1; i < data.length; i++) {
+      jsonData.push({
+        id: data[i][0] || "",
+        input_type: data[i][1] || "",
+        raw_input: data[i][2] || "",
+        source_title: data[i][3] || "",
+        source_url: data[i][4] || "",
+        created_at: data[i][5] || "",
+        source_platform: data[i][6] || "",
+        content_type: data[i][7] || "",
+        summary: data[i][8] || "",
+        key_points: data[i][9] || "",
+        tags: data[i][10] || "",
+        use_case: data[i][11] || "",
+        topic_category: data[i][12] || "",
+        confidence_level: data[i][13] || "",
+        parse_status: data[i][14] || ""
+      });
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(jsonData))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 舊版預設分支
   var sheet = getLegacySheet();
   var data = sheet.getDataRange().getValues();
   
@@ -104,10 +142,10 @@ function doGet(e) {
   var jsonData = [];
   for (var i = 1; i < data.length; i++) {
     jsonData.push({
-      time: data[i][0],
-      title: data[i][1],
-      tags: data[i][2],
-      source: data[i][3]
+      time: data[i][0] || "",
+      title: data[i][1] || "",
+      tags: data[i][2] || "",
+      source: data[i][3] || ""
     });
   }
 
@@ -150,6 +188,53 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     } else {
       return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "Unsupported sheet for overwrite" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 支援更新單一 Row 資料 (action = update_row)
+  if (data.action === "update_row") {
+    if (data.sheet_name === LIBRARY_V2_SHEET_NAME) {
+      var libraryV2Sheet = getOrCreateSheetByName(LIBRARY_V2_SHEET_NAME);
+      ensureLibraryV2Headers(libraryV2Sheet);
+      var sheetData = libraryV2Sheet.getDataRange().getValues();
+      var targetId = data.id;
+      var foundRowIndex = -1;
+
+      for (var i = 1; i < sheetData.length; i++) {
+        if (String(sheetData[i][0]) === String(targetId)) {
+          foundRowIndex = i + 1; // Google Sheets 是 1-indexed 且加上標題行
+          break;
+        }
+      }
+
+      if (foundRowIndex !== -1) {
+        var range = libraryV2Sheet.getRange(foundRowIndex, 1, 1, LIBRARY_V2_HEADERS.length);
+        range.setValues([[
+          data.id || "",
+          data.input_type || "",
+          data.raw_input || "",
+          data.source_title || "",
+          data.source_url || "",
+          data.created_at || "",
+          data.source_platform || "",
+          data.content_type || "",
+          data.summary || "",
+          data.key_points || "",
+          data.tags || "",
+          data.use_case || "",
+          data.topic_category || "",
+          data.confidence_level || "",
+          data.parse_status || ""
+        ]]);
+        return ContentService.createTextOutput(JSON.stringify({ "result": "success", "action": "update_row" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "ID not found: " + targetId }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } else {
+      return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "Unsupported sheet for update" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
   }

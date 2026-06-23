@@ -52,94 +52,24 @@ async function tryOEmbed(url: string): Promise<string | null> {
   }
 }
 
-// ============================================================
-// 網域常數與共用變數
-// ============================================================
 
-const SOCIAL_DOMAINS = [
-  "facebook.com",
-  "instagram.com",
-  "threads.net",
-  "threads.com",
-  "x.com",
-  "twitter.com",
-];
-
-// ============================================================
-// 第二層：社群 API 解析 (社群平台專用，使用 Microlink)
-// ============================================================
-
-async function trySocialApi(url: string): Promise<string | null> {
-  try {
-    const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}`;
-    console.log(`[Extractor] Microlink 請求: ${apiUrl}`);
-
-    const response = await fetch(apiUrl, {
-      next: { revalidate: 3600 },
-    });
-
-    if (!response.ok) {
-      console.log(`[Extractor] Microlink 失敗: ${response.status}`);
-      return null;
-    }
-
-    const json = await response.json();
-    if (json.status === "success" && json.data?.title) {
-      console.log(`[Extractor] Microlink 成功: ${json.data.title}`);
-      return decodeHtmlEntities(json.data.title);
-    }
-
-    return null;
-  } catch (error) {
-    console.error("[Extractor] Microlink 錯誤:", error);
-    return null;
-  }
+export interface SocialExtractResult {
+  title: string;
+  description: string;
+  platform: string;
+  parse_status: "complete" | "partial";
+  confidence_level: "high" | "medium" | "low";
 }
 
-// ============================================================
-// 第三層：HTML 解析 (一般網站用)
-// ============================================================
 
-async function tryHtmlParse(url: string): Promise<string | null> {
-  try {
-
-    const headers: Record<string, string> = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-      Range: "bytes=0-65535",
-    };
-
-    const response = await fetch(url, {
-      headers,
-      next: { revalidate: 600 },
-      redirect: "follow",
-    });
-
-    // 若 Range 被拒，嘗試完整請求
-    if (!response.ok && response.status !== 206) {
-      delete headers["Range"];
-      const retryResponse = await fetch(url, {
-        headers,
-        next: { revalidate: 600 },
-      });
-      if (!retryResponse.ok) return null;
-      return parseTitle(await retryResponse.text());
-    }
-
-    return parseTitle(await response.text());
-  } catch (error) {
-    console.error("[Extractor] HTML 解析錯誤:", error);
-    return null;
-  }
-}
 
 /**
- * 從 HTML 中解析標題，優先順序：JSON-LD > og:title > title
+ * 同時解析 HTML 中的 Title 與 Description
  */
-function parseTitle(html: string): string | null {
+function parseHtmlMetadata(html: string): { title: string | null; description: string | null } {
+  let title: string | null = null;
+  let description: string | null = null;
+
   // 1. JSON-LD
   const jsonLdMatch = html.match(
     /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i
@@ -147,46 +77,78 @@ function parseTitle(html: string): string | null {
   if (jsonLdMatch?.[1]) {
     try {
       const data = JSON.parse(jsonLdMatch[1]);
-      const title =
+      title =
         data.headline ||
         data.name ||
         (data["@graph"] && data["@graph"][0]?.name);
-      if (title && typeof title === "string" && title.length > 3) {
-        return decodeHtmlEntities(title.trim());
-      }
+      
+      description = data.description || (data["@graph"] && data["@graph"][0]?.description) || null;
     } catch {
-      // JSON 解析失敗，繼續
+      // 忽略 JSON 錯誤
     }
   }
 
-  // 2. og:title (支援各種引號與屬性順序)
-  const ogMatch =
-    html.match(/<meta[^>]*property=["']?og:title["']?[^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']?og:title["']?/i);
-  if (ogMatch?.[1] && ogMatch[1].trim().length > 2) {
-    return decodeHtmlEntities(ogMatch[1].trim());
+  // 2. og:title
+  if (!title) {
+    const ogMatch =
+      html.match(/<meta[^>]*property=["']?og:title["']?[^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']?og:title["']?/i);
+    if (ogMatch?.[1] && ogMatch[1].trim().length > 2) {
+      title = decodeHtmlEntities(ogMatch[1].trim());
+    }
   }
 
-  // 3. twitter:title (常見備用 meta)
-  const twitterMatch =
-    html.match(/<meta[^>]*name=["']?twitter:title["']?[^>]*content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']?twitter:title["']?/i);
-  if (twitterMatch?.[1] && twitterMatch[1].trim().length > 2) {
-    return decodeHtmlEntities(twitterMatch[1].trim());
+  // 3. twitter:title
+  if (!title) {
+    const twitterMatch =
+      html.match(/<meta[^>]*name=["']?twitter:title["']?[^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']?twitter:title["']?/i);
+    if (twitterMatch?.[1] && twitterMatch[1].trim().length > 2) {
+      title = decodeHtmlEntities(twitterMatch[1].trim());
+    }
   }
 
   // 4. <title>
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  if (titleMatch?.[1]) {
-    const raw = titleMatch[1].trim();
-    // 過濾無意義的頁面標題
-    const blacklist = ["Facebook", "YouTube", "Instagram", "Log In", "Login"];
-    if (raw.length > 2 && !blacklist.some((b) => raw === b || raw.includes(b))) {
-      return decodeHtmlEntities(raw);
+  if (!title) {
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleMatch?.[1]) {
+      const raw = titleMatch[1].trim();
+      const blacklist = ["Facebook", "YouTube", "Instagram", "Log In", "Login"];
+      if (raw.length > 2 && !blacklist.some((b) => raw === b || raw.includes(b))) {
+        title = decodeHtmlEntities(raw);
+      }
     }
   }
 
-  return null;
+  // 5. og:description
+  const ogDescMatch =
+    html.match(/<meta[^>]*property=["']?og:description["']?[^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']?og:description["']?/i);
+  if (ogDescMatch?.[1]) {
+    description = decodeHtmlEntities(ogDescMatch[1].trim());
+  }
+
+  // 6. twitter:description
+  if (!description) {
+    const twitterDescMatch =
+      html.match(/<meta[^>]*name=["']?twitter:description["']?[^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']?twitter:description["']?/i);
+    if (twitterDescMatch?.[1]) {
+      description = decodeHtmlEntities(twitterDescMatch[1].trim());
+    }
+  }
+
+  // 7. description meta
+  if (!description) {
+    const descMatch =
+      html.match(/<meta[^>]*name=["']?description["']?[^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']?description["']?/i);
+    if (descMatch?.[1]) {
+      description = decodeHtmlEntities(descMatch[1].trim());
+    }
+  }
+
+  return { title, description };
 }
 
 function decodeHtmlEntities(str: string): string {
@@ -218,6 +180,7 @@ function fallbackTitle(url: string): string {
       "threads.com": "Threads",
       "x.com": "X (Twitter)",
       "twitter.com": "X (Twitter)",
+      "linkedin.com": "LinkedIn",
     };
     const name = Object.entries(nameMap).find(([d]) =>
       hostname.includes(d)
@@ -228,36 +191,268 @@ function fallbackTitle(url: string): string {
   }
 }
 
-// ============================================================
-// 主入口
-// ============================================================
 
-export async function extractTitle(url: string): Promise<string> {
-  console.log(`[Extractor] 開始提取: ${url}`);
+/**
+ * 專為社群網域設計的內容擷取方法，支援 title/description 解析及防擋降級判定
+ */
+export async function extractSocialContent(url: string): Promise<SocialExtractResult> {
+  console.log(`[Extractor] 開始擷取社群網址內容: ${url}`);
+  const hostname = new URL(url).hostname.toLowerCase();
 
-  // 第一層：oEmbed (YouTube 等有官方 API 的平台)
-  const oembedTitle = await tryOEmbed(url);
-  if (oembedTitle) return oembedTitle;
-
-  const hostname = new URL(url).hostname;
-  const isSocial = SOCIAL_DOMAINS.some((d) => hostname.includes(d));
-
-  if (isSocial) {
-    // 第二層：社群網站 (走 Microlink API)
-    console.log(`[Extractor] 偵測到社群網域 ${hostname}，使用 Microlink API 解析`);
-    const socialTitle = await trySocialApi(url);
-    if (socialTitle) return socialTitle;
-    // Microlink 失敗時，也嘗試 HTML 解析 (X/Threads 有時可直接爬取)
-    console.log(`[Extractor] Microlink 失敗，嘗試 HTML 解析作為備援`);
-    const htmlFallback = await tryHtmlParse(url);
-    if (htmlFallback) return htmlFallback;
-  } else {
-    // 第三層：HTML 解析 (一般網站)
-    const htmlTitle = await tryHtmlParse(url);
-    if (htmlTitle) return htmlTitle;
+  // 1. 判定平台
+  let platform = "unknown";
+  if (hostname.includes("threads.net") || hostname.includes("threads.com")) {
+    platform = "threads";
+  } else if (hostname.includes("facebook.com")) {
+    platform = "facebook";
+  } else if (hostname.includes("instagram.com")) {
+    platform = "instagram";
+  } else if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
+    platform = "x";
+  } else if (hostname.includes("linkedin.com")) {
+    platform = "linkedin";
   }
 
-  // 第四層：網域降級 (社群或完全無法抓取時兜底)
-  console.log(`[Extractor] API 輔助抓取失敗，使用網域降級`);
-  return fallbackTitle(url);
+  let title: string | null = null;
+  let description: string | null = null;
+
+  // 第一層嘗試：oEmbed (最快且通常不被擋，尤其是 Threads/YouTube)
+  title = await tryOEmbed(url);
+
+  // 第二層嘗試：Microlink API
+  if (!title || !description) {
+    try {
+      const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}`;
+      console.log(`[Extractor] Microlink 社群內容請求: ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        next: { revalidate: 3600 },
+      });
+
+      if (response.ok) {
+        const json = await response.json() as { status: string; data?: { title?: string; description?: string } };
+        if (json.status === "success" && json.data) {
+          if (!title && json.data.title) {
+            title = decodeHtmlEntities(json.data.title);
+          }
+          if (json.data.description) {
+            description = decodeHtmlEntities(json.data.description);
+          }
+          console.log(`[Extractor] Microlink 擷取社群成功. title="${title}", description="${description}"`);
+        }
+      } else {
+        console.log(`[Extractor] Microlink 擷取社群失敗: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("[Extractor] Microlink 社群解析錯誤:", error);
+    }
+  }
+
+  // 第三層嘗試：HTML 解析備援
+  if (!title || !description) {
+    try {
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+      };
+
+      const response = await fetch(url, {
+        headers,
+        next: { revalidate: 600 },
+        redirect: "follow",
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        const meta = parseHtmlMetadata(html);
+        if (!title) title = meta.title;
+        if (!description) description = meta.description;
+        console.log(`[Extractor] HTML 解析社群成功. title="${title}", description="${description}"`);
+      }
+    } catch (error) {
+      console.error("[Extractor] HTML 解析社群錯誤:", error);
+    }
+  }
+
+  // 判斷是否為無意義/無效的標題 (防阻擋特徵)
+  const isInvalidTitle = (t: string | null): boolean => {
+    if (!t) return true;
+    const lower = t.toLowerCase();
+    return (
+      lower.includes("log in") ||
+      lower.includes("login") ||
+      t === "Facebook" ||
+      t === "Instagram" ||
+      t === "Threads" ||
+      t === "Twitter" ||
+      t === "X" ||
+      t === "無法提取標題"
+    );
+  };
+
+  let parse_status: "complete" | "partial" = "complete";
+  let confidence_level: "high" | "medium" | "low" = "medium";
+
+  if (isInvalidTitle(title)) {
+    console.log(`[Extractor] 偵測到社群標題遭阻擋，執行降級`);
+    title = fallbackTitle(url);
+    description = "";
+    parse_status = "partial";
+    confidence_level = "low";
+  } else if (!description || description.trim().length === 0) {
+    description = "";
+    parse_status = "partial";
+    confidence_level = "low";
+  }
+
+  return {
+    title: title || fallbackTitle(url),
+    description: description || "",
+    platform,
+    parse_status,
+    confidence_level,
+  };
+}
+
+export interface GeneralExtractResult {
+  title: string;
+  description: string;
+  content: string;
+  platform: string;
+  parse_status: "complete" | "partial";
+  confidence_level: "high" | "medium" | "low";
+}
+
+function cleanHtmlText(html: string): string {
+  let clean = html.replace(/<head[\s\S]*?<\/head>/gi, "");
+  clean = clean.replace(/<script[\s\S]*?<\/script>/gi, "");
+  clean = clean.replace(/<style[\s\S]*?<\/style>/gi, "");
+  clean = clean.replace(/<[^>]+>/g, " ");
+  clean = decodeHtmlEntities(clean);
+  clean = clean.replace(/\s+/g, " ").trim();
+  return clean;
+}
+
+/**
+ * 專為一般網域網址設計的內容擷取方法，支援 title/description/正文 擷取及備援判定
+ */
+export async function extractGeneralContent(url: string): Promise<GeneralExtractResult> {
+  console.log(`[Extractor] 開始擷取一般網址內容: ${url}`);
+  
+  let title: string | null = null;
+  let description: string | null = null;
+  let content = "";
+  let parse_status: "complete" | "partial" = "complete";
+  let confidence_level: "high" | "medium" | "low" = "high";
+
+  // 第一層嘗試：直接 HTML fetch 解析
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    };
+
+    const response = await fetch(url, {
+      headers,
+      next: { revalidate: 600 },
+      redirect: "follow",
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      const meta = parseHtmlMetadata(html);
+      title = meta.title;
+      description = meta.description;
+      content = cleanHtmlText(html);
+      console.log(`[Extractor] HTML 擷取一般網址成功. title="${title}", description="${description}"`);
+    } else {
+      console.log(`[Extractor] HTML 擷取一般網址失敗: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("[Extractor] HTML 擷取一般網址錯誤:", error);
+  }
+
+  // 第二層嘗試：Microlink API 備援
+  if (!title) {
+    try {
+      const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}`;
+      console.log(`[Extractor] Microlink 一般網址內容請求: ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        next: { revalidate: 3600 },
+      });
+
+      if (response.ok) {
+        const json = await response.json() as { status: string; data?: { title?: string; description?: string } };
+        if (json.status === "success" && json.data) {
+          title = json.data.title ? decodeHtmlEntities(json.data.title) : null;
+          description = json.data.description ? decodeHtmlEntities(json.data.description) : null;
+          console.log(`[Extractor] Microlink 擷取一般網址成功. title="${title}", description="${description}"`);
+        }
+      }
+    } catch (error) {
+      console.error("[Extractor] Microlink 一般網址解析錯誤:", error);
+    }
+  }
+
+  // 判定是否有效
+  const isInvalidTitle = (t: string | null): boolean => {
+    if (!t) return true;
+    const lower = t.toLowerCase();
+    return (
+      lower.includes("log in") ||
+      lower.includes("login") ||
+      t === "Facebook" ||
+      t === "Instagram" ||
+      t === "Threads" ||
+      t === "Twitter" ||
+      t === "X" ||
+      t === "無法提取標題"
+    );
+  };
+
+  if (isInvalidTitle(title)) {
+    console.log(`[Extractor] 偵測到網頁標題無效或遭阻擋，執行降級`);
+    title = fallbackTitle(url);
+    description = "";
+    content = "";
+    parse_status = "partial";
+    confidence_level = "low";
+  } else {
+    // 擷取正文前 1000 個字
+    if (content.length > 1000) {
+      content = content.slice(0, 1000);
+    }
+
+    if (content.length > 200) {
+      confidence_level = "high";
+      parse_status = "complete";
+    } else if (content.length > 50 || (description && description.trim().length > 20)) {
+      confidence_level = "medium";
+      parse_status = "complete";
+    } else {
+      confidence_level = "low";
+      parse_status = "partial";
+    }
+  }
+
+  let platform = "Web";
+  try {
+    platform = new URL(url).hostname.replace("www.", "");
+  } catch {
+    // ignore
+  }
+
+  return {
+    title: title || fallbackTitle(url),
+    description: description || "",
+    content: content || "",
+    platform,
+    parse_status,
+    confidence_level,
+  };
 }
