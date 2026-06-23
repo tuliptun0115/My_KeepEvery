@@ -498,3 +498,5 @@
   - **Git 提交與 Push**：將本地所有開發變更與 GAS 代碼提交並推送到 GitHub `main` 分支，成功觸發 Google Cloud Build 自動化建置部署流程（Build ID: `36ef3d7f-c365-40c5-98d5-a64ad5e2f7db`）。
   - **Cloud Run 環境變數對齊與更新**：Cloud Run 的 `GOOGLE_GAS_URL` 在舊版本中仍指向舊版 Apps Script Web App。我們使用 `gcloud run services update` 命令，將其環境變數手動更新為最新 Apps Script 版本 `@6` 的 URL：`https://script.google.com/macros/s/AKfycbzZGoeND8gr4W14TA1jrKkcCi05yAJLDLkpxgftV-zwEXh7STj1jFMAC5kgPzN0f45fWQ/exec`。這確保了線上版 Next.js `/api/inspiration/update` 後端與 Apps Script `update_row` 功能完美對接。
   - **正式環境驗證 (Smoke Test)**：使用網頁存取工具驗證線上首頁 `/` 與列表頁 `/list` 皆可正常開啟且無 500 錯誤。統計卡片與最新筆數正常載入，分頁按鈕文字已改為 `« 最前頁` 與 `最後頁 »`。
+  - **LINE Webhook Endpoint 設定錯位排查與更新**：正式部署上線後，使用者測試發現 LINE 機器人無回應且無寫入。調閱 Cloud Run 日誌發現沒有任何來自 LINE 的 POST 請求。我們使用 LINE Messaging API 查詢目前 Bot 的 Webhook 真值，發現其仍配置在舊的 `https://inspiration-box-l7qdepde6a-de.a.run.app/api/webhook/line`。在取得使用者授權後，使用 Node.js 腳本發送 `PUT` 請求，成功將 LINE 官方後台的 Webhook 網址更新為新部署服務的 URL：`https://my-keepevery-41418623586.europe-west1.run.app/api/webhook/line`。經 API 再次驗證狀態為 `active: true`，成功打通 LINE 到 Cloud Run 的端到端請求。
+
