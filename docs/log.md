@@ -2,6 +2,16 @@
 
 ## 歷程更新與實作詳細記錄
 
+### v1.2.9 — 2026-06-26 ✅
+- **[Feature & UI Optimization]** 指令寶庫標題、分類調整、Favicon 及 UI 體驗重構：
+  - **指令標題**：`prompt_library` 新增 `prompt_title` 欄位（Sheets 第 7 欄）。支援手動輸入，或由 LINE Webhook 寫入時經由 Gemini `analyzePrompt()` 自動生成 20 字內簡短標題。
+  - **全站 Favicon**：移除預設的 `favicon.ico`，改為使用與 Logo 一致的 `✦` SVG Data URI。
+  - **收合式主題選單**：左側「主題快速入口」點擊可收合，並配備動態旋轉小箭頭 `▼`，預設為展開。
+  - **詳情頁導航外移**：將詳情頁「上一筆」、「下一筆」、「回列表頁」移到內容框外，置於右上角。
+  - **分類名稱更名**：分類「寫作生成」更名為「文案寫作」；「行銷文案」更名為「圖像生成」。
+- **[Cloud Run Deployment]** 正式部署上線：
+  - 正式環境 Cloud Run 部署完成（Revision `my-keepevery-00023-dtm` 運作中，100% 流量切換）。
+
 ### v1.2.8 — 2026-06-26 ✅
 - **[Cloud Run Deployment]** 正式環境部署完成：
   - `clasp push --force` 成功推送最新 GAS（含 `delete_row`），新版本 **@8** 已部署生效。
