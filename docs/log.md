@@ -2,6 +2,93 @@
 
 ## 歷程更新與實作詳細記錄
 
+### v1.2.8 — 2026-06-26 ✅
+- **[Cloud Run Deployment]** 正式環境部署完成：
+  - `clasp push --force` 成功推送最新 GAS（含 `delete_row`），新版本 **@8** 已部署生效。
+  - `gcloud builds submit` Build 成功（Build ID: `15440c70`），Docker image 推至 `gcr.io/my-tools-project-491609/my-keepevery:latest`。
+  - `gcloud run deploy` 成功，Revision `my-keepevery-00020-mdj` 上線，100% 流量切換。
+  - ✅ 正式網址：`https://my-keepevery-41418623586.europe-west1.run.app`
+
+### v1.2.7 — 2026-06-26
+
+- **[Delete Feature]** 指令寶庫刪除功能上線：
+  - **GAS `delete_row`**：在 `gas/程式碼.js` 的 `doPost` 中新增 `delete_row` action，支援 `library_v2` 與 `prompt_library` 兩張 sheet 的行刪除。⚠️ 需重新部署 GAS（新版本）才生效。
+  - **`sheets.ts`**：新增 `deletePromptLibraryRecord(id)` 函數，透過 POST + `delete_row` action 呼叫 GAS 刪除指定 id 的列。
+  - **API 路由**：新建 `src/app/api/prompts/delete/route.ts`，接收 `id` 後呼叫 `deletePromptLibraryRecord()`。
+  - **列表頁 UI**：`PromptListClient.tsx` Context Menu 新增「🗑️ 刪除指令」選項，點擊後彈出確認對話框，確認後呼叫 `/api/prompts/delete`，成功即從本地 state 移除並顯示 Toast。
+  - **詳情頁 UI**：`PromptDetailClient.tsx` 按鈕列新增「🗑️ 刪除」按鈕，確認後呼叫 `/api/prompts/delete`，成功後以 `router.push` 自動導回 `/prompts/list`。
+  - **驗證**：`npm run lint` 0 錯誤，`npm run build` 通過，共 13 個路由（含新增的 `/api/prompts/delete`）。
+
+### v1.2.6 — 2026-06-26
+
+- **[Detail Page & Full Completion (PL-05-3, PL-07)]** 詳情頁真資料連通與指令寶庫全功能完結：
+  - **PL-05-3 詳情頁 Server Component 重構**：將 `src/app/prompts/detail/page.tsx` 改為 `async` Server Component，透過 `searchParams` 取得 `id`，呼叫 `fetchPromptLibrary()` 後在伺服器端查找 `currentRecord`、`prevPrompt`、`nextPrompt`、`serial`，以 props 一次傳入 Client Component。
+  - **PromptDetailClient.tsx 重構**：完全移除 `useEffect`、`getStoredPrompts()`、`saveStoredPrompts()` 與 `localStorage` 依賴，改為純 props 渲染 + 本地 state 管理（編輯後只更新 currentRecord state）。
+  - **PL-07 Sidebar 確認**：確認 `Sidebar.tsx` 中「指令寶庫」連結指向 `/prompts`，active 判斷使用 `pathname.startsWith('/prompts')` 涵蓋所有子路由，無需修改。
+  - **PL-07 編譯驗證**：`npm run lint` 0 錯誤 0 警告，`npm run build` 通過，全部 12 個路由（`/prompts`、`/prompts/list`、`/prompts/detail`、`/api/prompts/add`、`/api/prompts/update` 等）均正常生成。
+  - **完結標誌**：指令寶庫（Prompt Library）PL-00 ～ PL-07 全功能完成上線。
+
+### v1.2.5 — 2026-06-26
+
+- **[Web API & Real Data Integration (PL-04, PL-05, PL-06)]** 網頁端指令寶庫 API 接通與真實資料連通：
+  - **PL-04-1/2（已預存）**：確認 `/api/prompts/add/route.ts` 與 `/api/prompts/update/route.ts` 已存在且邏輯正確；修正兩者的 `error: any` lint 錯誤，改為 `error: unknown` 並正確提取 message。
+  - **PL-05-1 首頁真資料連通**：將 `src/app/prompts/page.tsx` 改為 `async` Server Component，在伺服器端呼叫 `fetchPromptLibrary()` 取得完整 Sheets 資料，傳入 Client Component（最新 5 筆 + 總數）。
+  - **PL-05-2 列表頁真資料連通**：將 `src/app/prompts/list/page.tsx` 改為 `async` Server Component，載入全部 Prompt 資料後傳給 Client 端做搜尋篩選。
+  - **PL-05-1/2 Client 重構**：重構兩個 `PromptListClient.tsx`，接受 `initialRecords` / `totalCount` props，完全移除 `localStorage` / `getStoredPrompts()` / `saveStoredPrompts()` 依賴。
+  - **PL-06-1 AddPromptModal**：移除本地 localStorage 寫入，改為 async `fetch('/api/prompts/add', ...)`，由 server 回傳 AI 分類後的完整 prompt 物件。新增送出中 Loading 狀態顯示。
+  - **PL-06-2 EditPromptModal**：移除 localStorage 寫入，改為 async `fetch('/api/prompts/update', ...)`，由 server 回傳更新後 prompt 物件後更新 UI state。
+  - **編譯驗證**：`npm run lint` 0 錯誤，`npm run build` 通過，所有 12 個路由（含 `/prompts`、`/prompts/list`、`/api/prompts/add`、`/api/prompts/update`）均正常生成。
+
+### v1.2.4 — 2026-06-26
+
+- **[LINE Webhook Prompt Partition & AI Classifier (PL-01-3, PL-02, PL-03)]** LINE Webhook 智慧意圖判斷與指令分流上線：
+  - **sheets.ts 連接器補齊 (PL-01-3)**：在 `src/lib/sheets.ts` 新增對接雲端 `prompt_library` 的 `fetchPromptLibrary()`、`appendToPromptLibrary()` 與 `updatePromptLibraryRecord()` 讀寫與行更新方法，完成資料傳輸介面。
+  - **Gemini 意圖判定與指令分類 (PL-02)**：在 `src/lib/gemini.ts` 實作 `detectPromptIntent()`（基於 Prompt 語意特徵偵測是否為指令）與 `classifyPromptCategory()`（將指令自動分類至寫作生成、行銷文案、工作效率、開發技術、其他）。
+  - **LINE Webhook 分流接線與回覆 (PL-03)**：修改 `src/app/api/webhook/line/route.ts` 實作 `handlePromptMessage()`。當接收到文字訊息時：
+    - 若含 URL 則 100% 走一般網頁/社群靈感流寫入 `library_v2`。
+    - 若以 `/prompt` 開頭（顯式指令），則去除前綴、分類並寫入 `prompt_library`。
+    - 若無前綴，呼叫 `detectPromptIntent()` 進行 AI 語意偵測，判定為指令時（隱式指令）寫入 `prompt_library`；非指令時則降級回既有文字靈感流寫入 `library_v2`。
+  - **編譯與端到端 Smoke Test 驗證**：
+    - `npm run lint` 與 `npm run build` 均順利通過（0 錯誤）。
+    - 建立模擬 Webhook 發送腳本 `scratch/simulate_line_webhook.js`，實測「顯式 Prompt」、「隱式 Prompt」與「一般筆記」三種分流情境。
+    - 測試結果表明，系統對前兩者成功調用指令分類並以 `prompt_library` 寫入 Sheets；對後者順利以 `library_v2` 呼叫靈魂整理後寫入 Sheets。三種情境皆能順利返回 200 OK，完成端到端智慧分流驗證。
+
+### v1.2.3 — 2026-06-26
+- **[Prompt Library Database & GAS Setup (PL-01-1 & PL-01-2)]** 指令寶庫資料庫分頁建立與 GAS 部署：
+  - **GAS 程式碼分流升級**：修改 `gas/程式碼.js`，加入 `PROMPT_LIBRARY_SHEET_NAME` ("prompt_library") 與其對應的 6 個欄位 Headers (`id`, `prompt_category`, `prompt_text`, `created_at`, `updated_at`, `source_type`)。在 `doGet` 與 `doPost` 中新增指令寶庫的分流讀寫、覆寫、以及行更新（update_row）邏輯。
+  - **Apps Script 自動部署**：執行 `clasp push` 與 `clasp deploy -i AKfycbzZGoeND8gr4W14TA1jrKkcCi05yAJLDLkpxgftV-zwEXh7STj1jFMAC5kgPzN0f45fWQ`，成功將新版程式碼上傳部署為雲端 Web App 版本 `@7`，維持 Web App 網址不變。
+  - **雲端建表與初始化驗證**：建立並執行本地模擬寫入腳本 `scratch/test_prompt_sheet.js`，發送帶有 `sheet_name: "prompt_library"` 的 POST 寫入請求。GAS 接收後順利回傳 `result: success`，並在雲端 Google Sheets 中**自動建立了 `prompt_library` 分頁**、寫入首列 Headers 並成功 append 首筆初始測試資料，成功完成 `PL-01-1` 與 `PL-01-2` 的建表與部署分流驗證。
+
+### v1.2.2 — 2026-06-26
+- **[Prompt Library Home & List Refactor]** 指令寶庫頁面路由與分工重構：
+  - **首頁 `/prompts` 輕量化**：將原本作為列表的 `/prompts` 改為「指令寶庫首頁」。首頁只展示最新 5 筆指令 Table、移除搜尋與過濾篩選，並在右上側新增「看更多指令 →」連結跳轉至 `/prompts/list`。
+  - **列表頁 `/prompts/list` 建立**：新建獨立路由 `/prompts/list` 與客端 `PromptListClient.tsx`，用來承載完整搜尋、分類篩選與表格展示功能，確保原本的全部列表與 Context Menu 正常可用。
+  - **詳情頁連結微調**：將 [PromptDetailClient.tsx](file:///c:/Users/8475/Desktop/AI%20Project/My_KeepEvery/src/app/prompts/detail/PromptDetailClient.tsx) 中 2 處「回指令列表」連結改為指向 `/prompts/list`。
+  - **本地建置與驗證**：
+    - `npm run lint` 檢測通過（0 error, 5 warnings）。
+    - `npm run build` 動態路由與 API 生產建置打包驗證通過。
+    - 本地啟動 `npm run dev` 進行 Smoke Test，順利連通雲端 Sheets 載入 `/prompts` 與 `/prompts/list` 頁面（200 OK）。
+
+### v1.2.1 — 2026-06-26
+- **[Demo Cloud & Layout Alignment]** 完美對齊 Demo 雲朵與 Layout 至與正式版百分之百一致：
+  - **消失雲朵修復**：修復由於將實心背景色 `#fafafa` 設在 `.main-content` 容器上，導致內部 `z-index: -10` 的裝飾雲朵掉到實心背景底下被完全遮擋的問題。將 `#fafafa` 背景色移至最外層 `body`，並將 `.main-content` 設為 `transparent`，使背景雲朵與漸層背景能完美透出。
+  - **雙欄 Layout 跑版修復**：修正由於靜態 HTML 未經過 Next.js 的 Tailwind 類別編譯，導致預設缺乏 `body` 的 `flex` 佈局而造成的上下堆疊與內容下移跑版。在 `docs/demo/library-styles.css` 中直接為 `html`, `body` 加上必要的 `flex` 雙欄並排設定，並為 `.main-content` 加上 `flex: 1` 與 `overflow-y: auto` 滾動效果，完美重現線上正式版的佈局外觀。
+  - **視覺樣式對齊**：將 `docs/demo/library-styles.css` 中 `.cloud-wrap svg` 改回與正式版一模一樣的樣式：白色填充（`fill: #ffffff`）、白色描邊（`stroke: #ffffff`，線寬 `1.0`）、以及深灰色立體硬陰影（`filter: drop-shadow(4px 4px 0 #4a4a4a)`）。搭配 20% 與 15% 的不透明度，在粉白色背景上透出自然微弱的玻璃液態陰影感。
+  - **正式版保持不動**：確認正式版 `src/components/AnimatedClouds.tsx` 原本的效果即為符合預期的視覺設計，故不做任何改動。
+
+
+### v1.2.0 — 2026-06-26
+- **[Prompt Library Demo & Task Pivot]** 新增指令寶庫靜態 HTML 互動 Demo 頁面與任務重排：
+  - **任務計畫重整 (PL-00)**：依使用者要求，在指令寶庫開發的最前面加塞 `PL-00` Demo 網頁製作任務。同步更新了 `docs/tasks/2026-06-26-prompt-library.md` 與 `plan.md` 的下一步驟。
+  - **Mock 數據與樣式擴充**：在 `docs/demo/library-data.js` 中新增了 `PROMPT_RECORDS` 指令的 5 筆 mock 數據與獲取函數；在 `docs/demo/library-styles.css` 中追加了 Neobrutalist 風格的指令卡片、複製按鈕與狀態 Toast 等 Layout 樣式。
+  - **SaaS 雙欄版型全面對齊**：為解決 Demo 頁面與正式網頁版型差太多的反饋，將正式版的 SaaS 雙欄佈局（左側黑底 Sidebar，右側 Flex 內容區）樣式引入 `library-styles.css`，並同步改寫了 `library-demo.html` (首頁)、`list.html` (靈感列表)、`detail.html` (靈感詳細)、`prompts.html` (指令列表) 與 `prompts-detail.html` (指令詳細) 五個主要 Demo 網頁。
+  - **動態 Sidebar 選單與跳轉**：側邊欄內置了「控制台概覽」、「所有靈感列表」與「指令寶庫」的主選單導航，支援動態 active class 切換。此外，「主題快速入口」亦對接 JS，實現從 `library-data.js` 動態撈取靈魂主題進行渲染，確保 Demo 與實際運行環境百分之百一致。
+  - **指令寶庫列表 Demo 頁 (prompts.html)**：實作了獨立的指令寶庫首頁，支持關鍵字即時過濾、固定 5 大類別篩選，以及一鍵複製 Prompt 到剪貼簿的 Toast 氣泡提示。並以原生 HTML 元素模擬了手動新增與編輯指令的 Modal，數據在 `localStorage` 中進行存儲以利與詳情頁即時同步。
+  - **指令詳情 Demo 頁 (prompts-detail.html)**：實作了單筆指令詳情頁，支持展示完整 Prompt、一鍵複製、編輯 Modal 的觸發、以及上一筆/下一筆的快速導航切換。
+  - **文字與單元標題微調**：同步將 `list.html` 列表頁上方的頁面單元名稱更新為「所有靈感列表」，並將副標題修正為「在此搜尋並多重過濾篩選您收藏的靈感與筆記。」，與正式版畫面百分之百對齊。
+  - **移除 Bento 邊框與雲朵疊加效果**：將 5 個 Demo HTML 頁面大標題周圍的 Bento 貼紙邊框 `.title-sticker` 移除，改用與正式版一致的簡約 `dashboard-header` 大標頭排版，促使原本被白底邊框遮擋的背景雲朵 `.cloud-a` 能完美露出，自然浮現在大標題文字下方，達成截圖所示之雲朵文字疊加效果。
+  - **首頁統計數據卡片 (Stats Cards)**：在 `library-demo.html` 加入正式版專屬的 4 個數據統計卡片網格與 CSS（靈感總數、高品質 AI 整理、部分解析與歸檔、最新更新時間），對齊 SaaS 數據控制台的高擬真體驗。
+
 ### v1.1.26 — 2026-06-23
 - **[Mobile RWD Sidebar & Scroll Fix]** 手機版 RWD 側邊欄隱藏遮擋與滾動性修復：
   - **CSS 樣式加載收攏**：將 `library.css` 統一在根佈局 `src/app/layout.tsx` 最上方引入，並移除 `src/app/page.tsx`、`src/app/list/page.tsx`、`src/app/detail/page.tsx` 中重複的 CSS 引入。這保證了全站佈局元件（尤其是 Layout 中的常駐 `Sidebar`）能獲得一致的 RWD 渲染樣式。

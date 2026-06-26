@@ -438,3 +438,157 @@ ${context}
   }
 }
 
+/**
+ * 偵測一段文字是否為指令 (Prompt)
+ */
+export async function detectPromptIntent(text: string): Promise<boolean> {
+  try {
+    const prompt = `
+你是一個 AI 指令（Prompt）意圖檢測器。你的任務是判斷以下文字是否屬於一個「AI 提示詞/指令/Prompt 範本」或是關於「提示詞寫作、Prompt 使用教學」的內容。
+請分析這段文字的語意，判斷它是要拿來「命令 AI / 作為 AI 模板」或是「純粹是一般的靈感筆記或聊天記錄」。
+
+待分析文字：
+"""
+${text}
+"""
+
+規則：
+1. 若該文字包含結構化的提示詞語法（如「請扮演...」、「角色：...」、「以下是限制：...」、「你是一個...」）、或包含變數預留位置（如 [請輸入]、{topic}）、或是明顯的 AI 指令範本，回傳 true。
+2. 若該文字只是使用者的日常隨筆、未經過結構化的想法、社群文章摘錄、或是完全不具備指令特徵，回傳 false。
+3. 僅回傳 JSON 格式：{"is_prompt": true} 或 {"is_prompt": false}
+4. 不要包含 any 額外的文字、解釋或 Markdown 語法。
+`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+    });
+
+    const resText = response.text ?? "";
+    const jsonText = extractJsonObject(resText);
+    if (!jsonText) {
+      return false;
+    }
+
+    const parsed = JSON.parse(jsonText);
+    return !!parsed.is_prompt;
+  } catch (error) {
+    console.error("[Gemini] detectPromptIntent 失敗:", error);
+    return false;
+  }
+}
+
+/**
+ * 將指令分類至固定 5 大類之一
+ */
+export async function classifyPromptCategory(text: string): Promise<string> {
+  try {
+    const prompt = `
+你是一個 AI 指令分類專家。請將以下這段 AI 提示詞/指令（Prompt），分類到以下 5 個預定義類別中的其中「一個」：
+1. 寫作生成：文章寫作、翻譯、總結、靈感發想、語意潤飾、內容創作、編劇。
+2. 行銷文案：廣告詞、產品描述、SEO優化、社群貼文規劃、電商文案、企劃書。
+3. 工作效率：日常排程、格式轉換、表格處理、邏輯推理、會議記錄整理、數據分析。
+4. 開發技術：寫程式碼、除錯、資料庫查詢、架構設計、系統配置、腳本撰寫。
+5. 其他：若上述分類均不適合，則分到此類。
+
+待分類指令：
+"""
+${text}
+"""
+
+規則：
+1. 僅從上述 5 個類別名稱（寫作生成、行銷文案、工作效率、開發技術、其他）中擇一回傳，不要自己創造新的類別。
+2. 僅回傳 JSON 格式：{"category": "類別名稱"}
+3. 不要包含 any 額外的文字、解釋或 Markdown 語法。
+`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+    });
+
+    const resText = response.text ?? "";
+    const jsonText = extractJsonObject(resText);
+    if (!jsonText) {
+      return "其他";
+    }
+
+    const parsed = JSON.parse(jsonText);
+    const category = parsed.category || "其他";
+    
+    const validCategories = ["寫作生成", "行銷文案", "工作效率", "開發技術", "其他"];
+    return validCategories.includes(category) ? category : "其他";
+  } catch (error) {
+    console.error("[Gemini] classifyPromptCategory 失敗:", error);
+    return "其他";
+  }
+}
+
+export interface PromptAnalysis {
+  category: string;
+  title: string;
+}
+
+/**
+ * 同時分析指令的分類並生成一個簡短（20字內）的標題
+ */
+export async function analyzePrompt(text: string): Promise<PromptAnalysis> {
+  try {
+    const prompt = `
+你是一個 AI 指令分析專家。請閱讀以下這段 AI 提示詞/指令（Prompt），進行兩項分析：
+1. 分類：從以下 5 個類別名稱中擇一最貼切的（文案寫作、圖像生成、工作效率、開發技術、其他）。
+2. 標題：為此指令生成一個簡短且具代表性的繁體中文標題，長度必須在 20 個字元以內。
+
+待分析指令：
+"""
+${text}
+"""
+
+規則：
+1. 類別必須完全符合這五個之一（大小寫與字元需完全一致）：文案寫作、圖像生成、工作效率、開發技術、其他。
+2. 標題要簡潔有力，直指此指令的核心功能（例如：「英文 Email 潤飾」、「React 節流 Hook 撰寫」、「會議記錄快速整理」），字數嚴格控制在 20 字以內，不要包含引號或多餘前綴。
+3. 僅回傳 JSON 格式：{"category": "類別名稱", "title": "生成的標題"}
+4. 不要包含任何額外的文字、解釋或 Markdown 語法。
+`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+    });
+
+    const resText = response.text ?? "";
+    console.log("[Gemini] analyzePrompt 原始回應:", resText.substring(0, 150));
+
+    const jsonText = extractJsonObject(resText);
+    if (!jsonText) {
+      return { category: "其他", title: text.slice(0, 15).trim() + "..." };
+    }
+
+    const parsed = JSON.parse(jsonText);
+    const category = parsed.category || "其他";
+    const title = parsed.title || text.slice(0, 15).trim() + "...";
+    
+    const validCategories = ["文案寫作", "圖像生成", "工作效率", "開發技術", "其他"];
+    const finalCategory = validCategories.includes(category) ? category : "其他";
+    
+    let finalTitle = title.trim();
+    // 移除引號
+    finalTitle = finalTitle.replace(/^["'「『【(]+|["'」』】)]+$/g, "");
+    if (finalTitle.length > 20) {
+      finalTitle = finalTitle.slice(0, 20).trim();
+    }
+
+    return {
+      category: finalCategory,
+      title: finalTitle || text.slice(0, 15).trim() + "..."
+    };
+  } catch (error) {
+    console.error("[Gemini] analyzePrompt 失敗:", error);
+    return {
+      category: "其他",
+      title: text.slice(0, 15).trim() + "..."
+    };
+  }
+}
+
+

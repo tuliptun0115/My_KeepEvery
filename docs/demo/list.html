@@ -1,87 +1,227 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>收藏列表</title>
-  <link rel="stylesheet" href="./library-styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>靈感收藏庫 - 所有靈感列表</title>
+  <link rel="stylesheet" href="./library-styles.css">
 </head>
 <body>
-  <div class="shell">
-    <div class="cloud-wrap cloud-a" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
-    </div>
-    <div class="cloud-wrap cloud-b" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
-    </div>
-    <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
-    <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+  
+  <!-- 手機版選單切換按鈕 -->
+  <button 
+    class="sidebar-mobile-toggle"
+    onclick="toggleMobileSidebar()"
+    aria-label="切換選單"
+  >
+    ☰
+  </button>
 
-    <main class="frame">
-      <section class="hero">
-        <div class="hero-main">
-          <a class="nav-pill" href="./library-demo.html">回首頁</a>
-          <div class="title-sticker">
-            <h1>收藏列表</h1>
-          </div>
-          <p class="hero-copy">依用途與主題篩選收藏，每頁顯示 10 筆，適合集中回找與瀏覽。</p>
-          <div id="list-hero-stats" class="hero-stats"></div>
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <aside id="sidebar-aside" class="sidebar">
+    <!-- 頂部 Logo -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">靈感收藏庫</span>
+    </div>
+
+    <!-- 總收藏統計 -->
+    <div class="sidebar-stats">
+      <span class="stats-label">靈感總數</span>
+      <span class="stats-value" id="sidebar-total-count">0</span>
+    </div>
+
+    <!-- 主選單 -->
+    <nav class="sidebar-menu">
+      <div class="menu-group-label">主要選單</div>
+      <a 
+        href="./library-demo.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📊</span>
+        <span class="menu-text">控制台概覽</span>
+      </a>
+      <a 
+        href="./list.html" 
+        class="menu-item active"
+      >
+        <span class="menu-icon">📚</span>
+        <span class="menu-text">所有靈感列表</span>
+      </a>
+      <a 
+        href="./prompts.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">⚡</span>
+        <span class="menu-text">指令寶庫</span>
+      </a>
+    </nav>
+
+    <!-- 主題入口選單 -->
+    <div class="sidebar-topics">
+      <div class="menu-group-label">主題快速入口</div>
+      <div class="topic-list" id="sidebar-topic-list"></div>
+    </div>
+  </aside>
+  
+
+  <!-- 主內容區 -->
+  <div class="main-content">
+    
+  <div class="cloud-wrap cloud-a" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+  </div>
+  <div class="cloud-wrap cloud-b" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+  </div>
+  <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+  <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+
+    <main class="frame shell" style="position: relative; z-index: 10; maxWidth: 1200px; margin: 0 auto;">
+      <!-- Toast 提示通知 -->
+      <div id="toast-notify" class="toast-notification" style="display: none;"></div>
+
+      <!-- SaaS 大標頭與功能按鈕 -->
+      <section class="dashboard-header" style="padding: 24px 0 12px; display: flex; justifyContent: space-between; alignItems: center; flexWrap: wrap; gap: 16px;">
+        <div>
+          <h1 class="dashboard-title" style="font-size: 28px; font-weight: bold; color: #2d2d2d; margin: 0;">所有靈感列表</h1>
+          <p style="color: #666; font-size: 14px; margin-top: 4px; margin-bottom: 0;">
+            在此搜尋並多重過濾篩選您收藏的靈感與筆記。
+          </p>
+        </div>
+        <div class="header-actions">
+          <button class="link-button accent-button" style="cursor: pointer; margin: 0;" onclick="alert('手動新增模式')">
+            ➕ 手動新增靈感
+          </button>
         </div>
       </section>
 
-      <section class="controls toolbar-panel">
+      <!-- 過濾面板 -->
+      <section class="controls toolbar-panel" style="margin-top: 24px;">
         <div class="toolbar-row toolbar-list-primary">
-          <label class="search toolbar-search">
-            <input id="search-input" type="text" placeholder="搜尋摘要、標題、標籤或重點..." />
+          <label class="search toolbar-search" style="flex-grow: 1;">
+            <input id="search-input" type="text" placeholder="搜尋摘要、標題、標籤或重點..." oninput="handleSearch()" />
           </label>
-          <select id="use-case-filter" class="filter-select"></select>
-          <select id="topic-filter" class="filter-select"></select>
-          <select id="sort-filter" class="filter-select narrow-select"></select>
+          <select id="use-case-filter" class="filter-select" onchange="handleFilterChange()"></select>
+          <select id="topic-filter" class="filter-select" onchange="handleFilterChange()"></select>
+          <select id="sort-filter" class="filter-select narrow-select" onchange="handleFilterChange()">
+            <option value="latest">最新優先</option>
+            <option value="oldest">最舊優先</option>
+            <option value="high_confidence">高信心優先</option>
+          </select>
         </div>
-        <div class="toolbar-row toolbar-list-secondary">
-          <select id="platform-filter" class="filter-select"></select>
-          <select id="confidence-filter" class="filter-select"></select>
-          <select id="time-filter" class="filter-select"></select>
-          <button id="clear-filters" class="text-action" type="button">清除條件</button>
+        <div class="toolbar-row toolbar-list-secondary" style="margin-top: 10px;">
+          <select id="platform-filter" class="filter-select" onchange="handleFilterChange()"></select>
+          <select id="confidence-filter" class="filter-select" onchange="handleFilterChange()"></select>
+          <select id="time-filter" class="filter-select" onchange="handleFilterChange()">
+            <option value="全部時間">全部時間</option>
+            <option value="最近 3 天">最近 3 天</option>
+            <option value="最近 7 天">最近 7 天</option>
+          </select>
+          <button id="clear-filters" class="text-action" type="button" onclick="clearFilters()">清除條件</button>
         </div>
       </section>
 
-      <section class="notice toolbar-meta-panel">
-        <div class="toolbar-row toolbar-summary-row">
+      <!-- 統計數據與已選條件 -->
+      <section class="notice toolbar-meta-panel" style="margin-top: 16px;">
+        <div class="toolbar-row toolbar-summary-row" style="display: flex; justify-content: space-between;">
           <div id="result-count" class="toolbar-result">目前顯示 0 / 0 筆收藏。</div>
           <div id="active-filters" class="notice-summary toolbar-summary"></div>
         </div>
       </section>
 
+      <!-- 收藏結果表格區塊 -->
       <section class="results">
-        <div id="list-grid" class="list-grid"></div>
-        <div id="empty-state" class="empty" hidden>目前沒有符合條件的收藏。</div>
-        <div id="pagination" class="pagination"></div>
+        <!-- 表格排版 (Table Layout) -->
+        <div class="table-responsive">
+          <table class="inspiration-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;" class="rwd-hide"><input type="checkbox" disabled /></th>
+                <th style="width: 60px;">序號</th>
+                <th>摘要與原始標題</th>
+                <th style="width: 140px;">主題分類</th>
+                <th style="width: 140px;">用途分類</th>
+                <th style="width: 150px;">收藏時間</th>
+                <th style="width: 60px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="inspiration-table-body"></tbody>
+          </table>
+        </div>
+
+        <div id="empty-state" class="empty" style="display: none; margin-top: 20px;">
+          目前沒有符合條件的收藏。
+        </div>
+
+        <!-- 分頁器 -->
+        <div id="pagination" class="pagination" style="margin-top: 24px;"></div>
       </section>
     </main>
   </div>
 
   <script src="./library-data.js"></script>
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const pageSize = 10;
-    const searchInput = document.getElementById("search-input");
-    const useCaseFilter = document.getElementById("use-case-filter");
-    const topicFilter = document.getElementById("topic-filter");
-    const sortFilter = document.getElementById("sort-filter");
-    const platformFilter = document.getElementById("platform-filter");
-    const confidenceFilter = document.getElementById("confidence-filter");
-    const timeFilter = document.getElementById("time-filter");
-    const clearFiltersButton = document.getElementById("clear-filters");
-    const resultCount = document.getElementById("result-count");
-    const activeFilters = document.getElementById("active-filters");
-    const listHeroStats = document.getElementById("list-hero-stats");
-    const listGrid = document.getElementById("list-grid");
-    const emptyState = document.getElementById("empty-state");
-    const pagination = document.getElementById("pagination");
+    
+  function toggleMobileSidebar() {
+    const sidebar = document.getElementById("sidebar-aside");
+    const overlay = document.getElementById("sidebar-overlay");
+    const toggleBtn = document.querySelector(".sidebar-mobile-toggle");
+    
+    if (sidebar.classList.contains("mobile-open")) {
+      sidebar.classList.remove("mobile-open");
+      overlay.style.display = "none";
+      toggleBtn.classList.remove("active");
+      toggleBtn.textContent = "☰";
+    } else {
+      sidebar.classList.add("mobile-open");
+      overlay.style.display = "block";
+      toggleBtn.classList.add("active");
+      toggleBtn.textContent = "✕";
+    }
+  }
 
+  function initSidebar(activeTopic = "") {
+    const orderedRecords = getOrderedRecords();
+    document.getElementById("sidebar-total-count").textContent = orderedRecords.length;
+    
+    if (typeof getTopicCategories === 'function') {
+      const topicList = document.getElementById("sidebar-topic-list");
+      const topics = getTopicCategories();
+      
+      const sortedTopics = [...topics].sort((a, b) => {
+        const priority = ['Prompt', 'AI 工具'];
+        const aIdx = priority.indexOf(a);
+        const bIdx = priority.indexOf(b);
+        
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.localeCompare(b);
+      });
+
+      topicList.innerHTML = sortedTopics.map(t => {
+        const isActive = activeTopic === t;
+        return `
+          <a href="./list.html?topic=${encodeURIComponent(t)}" class="topic-item ${isActive ? 'active' : ''}">
+            <span class="topic-bullet">✦</span>
+            <span class="topic-name">${t}</span>
+          </a>
+        `;
+      }).join("");
+    }
+  }
+
+
+    const ITEMS_PER_PAGE = 10;
+    const records = getOrderedRecords();
+    
+    const params = new URLSearchParams(window.location.search);
     const state = {
-      keyword: params.get("keyword") || params.get("search") || "",
+      keyword: params.get("keyword") || "",
       useCase: params.get("use_case") || "全部用途",
       topic: params.get("topic") || "全部主題",
       sort: params.get("sort") || "latest",
@@ -91,75 +231,49 @@
       page: Number(params.get("page") || "1")
     };
 
-    function renderTags(tags) {
-      return tags.slice(0, 4).map((tag) => `<span class="tag">#${tag}</span>`).join("");
-    }
+    let activeMenuId = null;
 
-    function updateUrl() {
-      const nextParams = new URLSearchParams();
-      if (state.keyword) nextParams.set("keyword", state.keyword);
-      if (state.useCase !== "全部用途") nextParams.set("use_case", state.useCase);
-      if (state.topic !== "全部主題") nextParams.set("topic", state.topic);
-      if (state.sort !== "latest") nextParams.set("sort", state.sort);
-      if (state.platform !== "全部來源") nextParams.set("platform", state.platform);
-      if (state.confidence !== "全部信心") nextParams.set("confidence", state.confidence);
-      if (state.time !== "全部時間") nextParams.set("time", state.time);
-      if (state.page > 1) nextParams.set("page", String(state.page));
-      const query = nextParams.toString();
-      history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
-    }
+    function populateFilterOptions() {
+      const useCases = ["全部用途", ...getUseCases()];
+      const topics = ["全部主題", ...getTopicCategories()];
+      const platforms = ["全部來源", ...new Set(records.map(r => r.source_platform))];
+      const confidences = ["全部信心", "high", "medium", "low"];
 
-    function populateFilters() {
-      const useCaseOptions = ["全部用途", ...getUseCases()];
-      const topicOptions = ["全部主題", ...getTopicCategories()];
-      const platformOptions = ["全部來源", ...new Set(getOrderedRecords().map((item) => item.source_platform))];
-      const confidenceOptions = ["全部信心", "high", "medium", "low"];
-      const timeOptions = ["全部時間", "最近 3 天", "最近 7 天"];
-      const sortOptions = [
-        { value: "latest", label: "最新優先" },
-        { value: "oldest", label: "最舊優先" },
-        { value: "high_confidence", label: "高信心優先" }
-      ];
-      useCaseFilter.innerHTML = useCaseOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      topicFilter.innerHTML = topicOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      platformFilter.innerHTML = platformOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      confidenceFilter.innerHTML = confidenceOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      timeFilter.innerHTML = timeOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      sortFilter.innerHTML = sortOptions.map((item) => `<option value="${item.value}">${item.label}</option>`).join("");
-      useCaseFilter.value = state.useCase;
-      topicFilter.value = state.topic;
-      platformFilter.value = state.platform;
-      confidenceFilter.value = state.confidence;
-      timeFilter.value = state.time;
-      sortFilter.value = state.sort;
-      searchInput.value = state.keyword;
+      document.getElementById('use-case-filter').innerHTML = useCases.map(u => `<option value="${u}">${u}</option>`).join('');
+      document.getElementById('topic-filter').innerHTML = topics.map(t => `<option value="${t}">${t}</option>`).join('');
+      document.getElementById('platform-filter').innerHTML = platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+      document.getElementById('confidence-filter').innerHTML = confidences.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      document.getElementById('use-case-filter').value = state.useCase;
+      document.getElementById('topic-filter').value = state.topic;
+      document.getElementById('platform-filter').value = state.platform;
+      document.getElementById('confidence-filter').value = state.confidence;
+      document.getElementById('time-filter').value = state.time;
+      document.getElementById('sort-filter').value = state.sort;
+      document.getElementById('search-input').value = state.keyword;
     }
 
     function isWithinTimeRange(item) {
-      if (state.time === "全部時間") {
-        return true;
-      }
-
-      const recordDate = new Date(item.created_at.replace(" ", "T"));
-      const latestDate = new Date(getOrderedRecords()[0].created_at.replace(" ", "T"));
+      if (state.time === "全部時間" || records.length === 0) return true;
+      const recordDate = new Date(item.created_at.replace(/\//g, '-').replace(' ', 'T'));
+      const latestDate = new Date(records[0].created_at.replace(/\//g, '-').replace(' ', 'T'));
       const diffMs = latestDate - recordDate;
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
       if (state.time === "最近 3 天") return diffDays <= 3;
       if (state.time === "最近 7 天") return diffDays <= 7;
       return true;
     }
 
-    function filterRecords() {
+    function getFilteredRecords() {
       const keyword = state.keyword.trim().toLowerCase();
-      const filtered = getOrderedRecords().filter((item) => {
+      let filtered = records.filter(item => {
         const text = [
           item.summary,
           item.source_title,
-          item.tags.join(" "),
-          item.key_points.join(" "),
           item.use_case,
-          item.topic_category
+          item.topic_category,
+          ...(item.tags || []),
+          ...(item.key_points || [])
         ].join(" ").toLowerCase();
 
         const hitKeyword = !keyword || text.includes(keyword);
@@ -168,193 +282,202 @@
         const hitPlatform = state.platform === "全部來源" || item.source_platform === state.platform;
         const hitConfidence = state.confidence === "全部信心" || item.confidence_level === state.confidence;
         const hitTime = isWithinTimeRange(item);
+
         return hitKeyword && hitUseCase && hitTopic && hitPlatform && hitConfidence && hitTime;
       });
 
       if (state.sort === "oldest") {
         return [...filtered].reverse();
-      }
-
-      if (state.sort === "high_confidence") {
+      } else if (state.sort === "high_confidence") {
         const rank = { high: 0, medium: 1, low: 2 };
         return [...filtered].sort((a, b) => {
-          const byConfidence = rank[a.confidence_level] - rank[b.confidence_level];
-          return byConfidence !== 0 ? byConfidence : b.created_at.localeCompare(a.created_at);
+          const diff = rank[a.confidence_level] - rank[b.confidence_level];
+          return diff !== 0 ? diff : b.created_at.localeCompare(a.created_at);
         });
       }
-
       return filtered;
     }
 
-    function renderCard(item, indexOffset) {
-      return `
-        <a class="record compact-record record-link" href="./detail.html?id=${encodeURIComponent(item.id)}">
-          <div class="compact-main">
-            <div class="record-top compact-top">
-              <div class="compact-meta">
-                <span class="record-number">${String(indexOffset).padStart(2, "0")}</span>
-                <span class="chip">${item.use_case}</span>
-                <span class="chip topic">${item.topic_category}</span>
-              </div>
-              <span class="record-time">${item.created_at}</span>
-            </div>
-            <div class="summary compact-summary">${item.summary}</div>
-            <div class="title compact-title">${item.source_title}</div>
-          </div>
-          <div class="compact-side">
-            <div class="tags compact-tags">${renderTags(item.tags)}</div>
-            <div class="record-actions compact-actions">
-              <span class="link-button subtle-button faux-button">查看內容</span>
-            </div>
-          </div>
-        </a>
-      `;
-    }
+    function renderList() {
+      const filtered = getFilteredRecords();
+      const tbody = document.getElementById('inspiration-table-body');
+      const emptyState = document.getElementById('empty-state');
+      
+      document.getElementById('result-count').textContent = `目前顯示 ${filtered.length} / ${records.length} 筆收藏。`;
+      
+      // 已選條件標示
+      const active = [];
+      if (state.useCase !== "全部用途") active.push(`用途：${state.useCase}`);
+      if (state.topic !== "全部主題") active.push(`主題：${state.topic}`);
+      if (state.platform !== "全部來源") active.push(`來源：${state.platform}`);
+      if (state.confidence !== "全部信心") active.push(`信心：${state.confidence}`);
+      if (state.time !== "全部時間") active.push(`時間：${state.time}`);
+      document.getElementById('active-filters').textContent = active.length ? `已選條件：${active.join("、")}` : "";
 
-    function renderPagination(totalPages) {
-      if (totalPages <= 1) {
-        pagination.innerHTML = "";
+      const start = (state.page - 1) * ITEMS_PER_PAGE;
+      const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+      if (paginated.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        document.getElementById('pagination').innerHTML = '';
         return;
       }
 
-      const prevPage = Math.max(1, state.page - 1);
-      const nextPage = Math.min(totalPages, state.page + 1);
+      emptyState.style.display = 'none';
+      tbody.innerHTML = paginated.map((item, index) => {
+        const isMenuOpen = activeMenuId === item.id;
+        const hasUrl = !!item.source_url;
+        const serial = String(filtered.length - (start + index)).padStart(2, '0');
+        const displayTime = item.created_at.split(' ')[0];
 
-      const prevHref = new URLSearchParams();
-      const nextHref = new URLSearchParams();
-      if (state.keyword) {
-        prevHref.set("keyword", state.keyword);
-        nextHref.set("keyword", state.keyword);
-      }
-      if (state.useCase !== "全部用途") {
-        prevHref.set("use_case", state.useCase);
-        nextHref.set("use_case", state.useCase);
-      }
-      if (state.topic !== "全部主題") {
-        prevHref.set("topic", state.topic);
-        nextHref.set("topic", state.topic);
-      }
-      if (state.sort !== "latest") {
-        prevHref.set("sort", state.sort);
-        nextHref.set("sort", state.sort);
-      }
-      if (state.platform !== "全部來源") {
-        prevHref.set("platform", state.platform);
-        nextHref.set("platform", state.platform);
-      }
-      if (state.confidence !== "全部信心") {
-        prevHref.set("confidence", state.confidence);
-        nextHref.set("confidence", state.confidence);
-      }
-      if (state.time !== "全部時間") {
-        prevHref.set("time", state.time);
-        nextHref.set("time", state.time);
-      }
-      prevHref.set("page", String(prevPage));
-      nextHref.set("page", String(nextPage));
+        return `
+          <tr onclick="window.location.href='./detail.html?id=' + encodeURIComponent('${item.id}')" style="cursor: pointer;">
+            <td class="rwd-hide" onclick="event.stopPropagation()"><input type="checkbox" disabled /></td>
+            <td data-label="序號">
+              <span class="table-number">${serial}</span>
+            </td>
+            <td data-label="摘要與標題">
+              <div class="table-summary-cell">
+                <a href="./detail.html?id=${encodeURIComponent(item.id)}" class="table-summary-link" onclick="event.stopPropagation()">
+                  ${item.summary}
+                </a>
+              </div>
+              <div class="table-title-cell" title="${item.source_title}">
+                ${item.source_title}
+              </div>
+            </td>
+            <td data-label="主題分類">
+              <span class="badge-tag topic-tag">${item.topic_category || '無'}</span>
+            </td>
+            <td data-label="用途分類">
+              <span class="badge-tag usecase-tag">${item.use_case || '無'}</span>
+            </td>
+            <td data-label="收藏時間">
+              <span class="table-time">${displayTime}</span>
+            </td>
+            <td style="position: relative;" onclick="event.stopPropagation()">
+              <button class="table-action-dots" onclick="toggleMenu(event, '${item.id}')">•••</button>
+              
+              ${isMenuOpen ? `
+                <div class="context-menu" style="display: flex;">
+                  <a href="./detail.html?id=${encodeURIComponent(item.id)}" class="context-menu-item">👁️ 查看詳情</a>
+                  ${hasUrl ? `<a href="${item.source_url}" target="_blank" rel="noopener noreferrer" class="context-menu-item">🔗 打開原文</a>` : `<span class="context-menu-item disabled" title="此筆收藏無外部連結">🔗 無原文連結</span>`}
+                  <button onclick="copySummary('${item.summary}')" class="context-menu-item btn-menu">📋 複製摘要</button>
+                  <button onclick="alert('✏️ 編輯靈感已被觸發！')" class="context-menu-item btn-menu">✏️ 編輯靈感</button>
+                  <button onclick="deleteRecord()" class="context-menu-item btn-menu text-danger">❌ 刪除收藏</button>
+                </div>
+              ` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
 
-      pagination.innerHTML = `
-        <a class="pager-link" href="?${prevHref.toString()}">上一頁</a>
-        <span class="page-state">第 ${state.page} / ${totalPages} 頁</span>
-        <a class="pager-link" href="?${nextHref.toString()}">下一頁</a>
-      `;
+      renderPagination(filtered.length);
     }
 
-    function render() {
-      const filtered = filterRecords();
-      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-      if (state.page > totalPages) state.page = totalPages;
-      if (state.page < 1) state.page = 1;
-      const start = (state.page - 1) * pageSize;
-      const pageRecords = filtered.slice(start, start + pageSize);
+    function renderPagination(totalCount) {
+      const pageCount = Math.ceil(totalCount / ITEMS_PER_PAGE);
+      const paginationDiv = document.getElementById('pagination');
+      if (pageCount <= 1) {
+        paginationDiv.innerHTML = '';
+        return;
+      }
 
-      resultCount.textContent = `目前顯示 ${pageRecords.length} / ${filtered.length} 筆收藏。`;
-      const allRecords = getOrderedRecords();
-      const highCount = allRecords.filter((item) => item.confidence_level === "high").length;
-      const partialCount = allRecords.filter((item) => item.parse_status === "partial").length;
-      listHeroStats.innerHTML = `
-        <span>收藏總數 ${allRecords.length}</span>
-        <span>高信心內容 ${highCount}</span>
-        <span>部分解析 ${partialCount}</span>
-        <span>最新更新 ${allRecords[0].created_at}</span>
-      `;
-      const activeItems = [
-        state.keyword ? `關鍵字：${state.keyword}` : "",
-        state.useCase !== "全部用途" ? `用途：${state.useCase}` : "",
-        state.topic !== "全部主題" ? `主題：${state.topic}` : "",
-        state.platform !== "全部來源" ? `來源：${state.platform}` : "",
-        state.confidence !== "全部信心" ? `信心：${state.confidence}` : "",
-        state.time !== "全部時間" ? `時間：${state.time}` : "",
-        state.sort !== "latest" ? `排序：${sortFilter.options[sortFilter.selectedIndex].text}` : ""
-      ].filter(Boolean);
-      activeFilters.innerHTML = activeItems.length
-        ? activeItems.map((item) => `<span>${item}</span>`).join("")
-        : "<span>目前未套用進階條件。</span>";
-      emptyState.hidden = filtered.length !== 0;
-      listGrid.innerHTML = pageRecords
-        .map((item, index) => renderCard(item, start + index + 1))
-        .join("");
-      renderPagination(totalPages);
+      let buttons = [];
+      buttons.push(`<button class="pager-link" onclick="goToPage(1)" ${state.page === 1 ? 'disabled' : ''}>« 最前頁</button>`);
+      for (let i = 1; i <= pageCount; i++) {
+        buttons.push(`<button class="pager-link ${state.page === i ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`);
+      }
+      buttons.push(`<button class="pager-link" onclick="goToPage(${pageCount})" ${state.page === pageCount ? 'disabled' : ''}>最後頁 »</button>`);
+      paginationDiv.innerHTML = buttons.join('');
+    }
+
+    function goToPage(p) {
+      state.page = p;
       updateUrl();
+      renderList();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    searchInput.addEventListener("input", (event) => {
-      state.keyword = event.target.value;
-      state.page = 1;
-      render();
-    });
+    function toggleMenu(event, id) {
+      if (activeMenuId === id) {
+        activeMenuId = null;
+      } else {
+        activeMenuId = id;
+      }
+      renderList();
+    }
 
-    useCaseFilter.addEventListener("change", (event) => {
-      state.useCase = event.target.value;
-      state.page = 1;
-      render();
-    });
+    function copySummary(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 已成功複製摘要內容！');
+        activeMenuId = null;
+        renderList();
+      });
+    }
 
-    topicFilter.addEventListener("change", (event) => {
-      state.topic = event.target.value;
-      state.page = 1;
-      render();
-    });
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notify');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2000);
+    }
 
-    sortFilter.addEventListener("change", (event) => {
-      state.sort = event.target.value;
-      state.page = 1;
-      render();
-    });
+    function deleteRecord() {
+      alert('🔐 本系統 Google Sheets 資料庫目前為唯讀狀態。\n若需刪除此筆記錄，請至 Google Sheets 試算表中進行編輯。');
+      activeMenuId = null;
+      renderList();
+    }
 
-    platformFilter.addEventListener("change", (event) => {
-      state.platform = event.target.value;
+    function handleSearch() {
+      state.keyword = document.getElementById('search-input').value;
       state.page = 1;
-      render();
-    });
+      updateUrl();
+      renderList();
+    }
 
-    confidenceFilter.addEventListener("change", (event) => {
-      state.confidence = event.target.value;
+    function handleFilterChange() {
+      state.useCase = document.getElementById('use-case-filter').value;
+      state.topic = document.getElementById('topic-filter').value;
+      state.platform = document.getElementById('platform-filter').value;
+      state.confidence = document.getElementById('confidence-filter').value;
+      state.time = document.getElementById('time-filter').value;
+      state.sort = document.getElementById('sort-filter').value;
       state.page = 1;
-      render();
-    });
+      updateUrl();
+      renderList();
+      initSidebar(state.topic !== "全部主題" ? state.topic : "");
+    }
 
-    timeFilter.addEventListener("change", (event) => {
-      state.time = event.target.value;
-      state.page = 1;
-      render();
-    });
-
-    clearFiltersButton.addEventListener("click", () => {
+    function clearFilters() {
       state.keyword = "";
       state.useCase = "全部用途";
       state.topic = "全部主題";
-      state.sort = "latest";
       state.platform = "全部來源";
       state.confidence = "全部信心";
       state.time = "全部時間";
+      state.sort = "latest";
       state.page = 1;
-      populateFilters();
-      render();
+      populateFilterOptions();
+      updateUrl();
+      renderList();
+      initSidebar();
+    }
+
+    // 點擊外部關閉選單
+    document.addEventListener('click', () => {
+      if (activeMenuId !== null) {
+        activeMenuId = null;
+        renderList();
+      }
     });
 
-    populateFilters();
-    render();
+    populateFilterOptions();
+    initSidebar(state.topic !== "全部主題" ? state.topic : "");
+    renderList();
   </script>
 </body>
 </html>

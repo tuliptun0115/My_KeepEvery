@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>指令寶庫 - Demo</title>
+  <link rel="stylesheet" href="./library-styles.css" />
+  <style>
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: #ffffff;
+      border: 3px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      width: 90%;
+      max-width: 600px;
+      padding: 24px;
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+    .modal-backdrop.show .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 3px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .form-control {
+      width: 100%;
+      border: 3px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .form-control:focus {
+      outline: none;
+      background: var(--accent-soft);
+    }
+    textarea.form-control {
+      min-height: 150px;
+      resize: vertical;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 12px;
+      border: 3px solid var(--border);
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--border);
+      font-size: 14px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--border);
+    }
+    .btn:active {
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 var(--border);
+    }
+    .btn-primary {
+      background: var(--accent-soft);
+    }
+    .btn-secondary {
+      background: #ffffff;
+    }
+    .add-btn-wrap {
+      margin-left: auto;
+    }
+    .category-filter-btn {
+      background: #ffffff;
+      border: 2px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 2px 2px 0 var(--border);
+      transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+    }
+    .category-filter-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 var(--border);
+      background: var(--accent-soft);
+    }
+    .category-filter-btn.active {
+      background: var(--accent-soft);
+      box-shadow: 1px 1px 0 var(--border);
+      transform: translate(1px, 1px);
+    }
+    .categories-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    @media (max-width: 768px) {
+      .toolbar-list-primary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .add-btn-wrap {
+        margin-left: 0;
+        width: 100%;
+      }
+      .add-btn-wrap button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 手機版選單切換按鈕 -->
+  <button class="sidebar-mobile-toggle" onclick="toggleMobileSidebar()" aria-label="切換選單">☰</button>
+
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <!-- Sidebar 側邊欄 -->
+  
+  <!-- 手機版選單切換按鈕 -->
+  <button 
+    class="sidebar-mobile-toggle"
+    onclick="toggleMobileSidebar()"
+    aria-label="切換選單"
+  >
+    ☰
+  </button>
+
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <aside id="sidebar-aside" class="sidebar">
+    <!-- 頂部 Logo -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">靈感收藏庫</span>
+    </div>
+
+    <!-- 總收藏統計 -->
+    <div class="sidebar-stats">
+      <span class="stats-label">靈感總數</span>
+      <span class="stats-value" id="sidebar-total-count">0</span>
+    </div>
+
+    <!-- 主選單 -->
+    <nav class="sidebar-menu">
+      <div class="menu-group-label">主要選單</div>
+      <a 
+        href="./library-demo.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📊</span>
+        <span class="menu-text">控制台概覽</span>
+      </a>
+      <a 
+        href="./list.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📚</span>
+        <span class="menu-text">所有靈感列表</span>
+      </a>
+      <a 
+        href="./prompts.html" 
+        class="menu-item active"
+      >
+        <span class="menu-icon">⚡</span>
+        <span class="menu-text">指令寶庫</span>
+      </a>
+    </nav>
+
+    <!-- 主題入口選單 -->
+    <div class="sidebar-topics">
+      <div class="menu-group-label">主題快速入口</div>
+      <div class="topic-list" id="sidebar-topic-list"></div>
+    </div>
+  </aside>
+  
+
+  <!-- 主內容區 -->
+  <div class="main-content">
+    <div class="shell">
+      <div class="cloud-wrap cloud-a" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+      </div>
+      <div class="cloud-wrap cloud-b" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+      </div>
+      <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+      <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+      <main class="frame">
+        <!-- SaaS 大標頭與功能按鈕 -->
+        <section class="dashboard-header" style="padding: 24px 0 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; position: relative; z-index: 10;">
+          <div>
+            <h1 class="dashboard-title" style="margin: 0; font-size: 28px; font-weight: bold; color: #2d2d2d;">指令寶庫</h1>
+            <p style="color: #666; font-size: 14px; margin-top: 4px; margin-bottom: 0;">收納可重複使用的 AI 提示詞範本。支援關鍵字搜尋、一鍵複製與即時編輯修改。</p>
+          </div>
+          <div class="header-actions" style="display: flex; gap: 12px;">
+            <button class="btn btn-primary" onclick="openAddModal()" style="margin: 0; padding: 10px 16px; font-size: 13px;">＋ 新增指令</button>
+          </div>
+        </section>
+
+        <div class="hero-stats" style="margin-top: 8px; margin-bottom: 16px; position: relative; z-index: 10;">
+          <span>✦ 總指令數: <span id="stat-total">0</span> 筆</span>
+          <span>✦ LINE 同步: <span id="stat-line">0</span> 筆</span>
+          <span>✦ 網頁新增: <span id="stat-web">0</span> 筆</span>
+        </div>
+
+        <section class="controls toolbar-panel" style="margin-top: 24px;">
+          <div class="toolbar-row toolbar-list-primary">
+            <label class="search toolbar-search" style="flex-grow: 1;">
+              <input id="search-input" type="text" placeholder="搜尋指令內容或分類..." />
+            </label>
+          </div>
+          <div class="categories-bar">
+            <button class="category-filter-btn active" data-category="全部" onclick="selectCategory('全部')">全部</button>
+            <button class="category-filter-btn" data-category="寫作生成" onclick="selectCategory('寫作生成')">寫作生成</button>
+            <button class="category-filter-btn" data-category="行銷文案" onclick="selectCategory('行銷文案')">行銷文案</button>
+            <button class="category-filter-btn" data-category="工作效率" onclick="selectCategory('工作效率')">工作效率</button>
+            <button class="category-filter-btn" data-category="開發技術" onclick="selectCategory('開發技術')">開發技術</button>
+            <button class="category-filter-btn" data-category="其他" onclick="selectCategory('其他')">其他</button>
+          </div>
+        </section>
+
+        <section class="notice toolbar-meta-panel">
+          <div class="toolbar-row toolbar-summary-row">
+            <div id="result-count" class="toolbar-result">目前顯示 0 / 0 筆指令。</div>
+          </div>
+        </section>
+
+        <section class="results">
+          <div id="prompt-grid" class="prompt-grid"></div>
+          <div id="empty-state" class="empty" hidden>目前沒有符合條件的指令。</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast 複製成功提示 -->
+  <div id="toast-message" class="toast">複製成功！</div>
+
+  <!-- Add Prompt Modal -->
+  <div id="add-modal" class="modal-backdrop" onclick="closeAddModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">手動新增指令</h3>
+        <button class="modal-close" onclick="closeAddModal()">&times;</button>
+      </div>
+      <form id="add-form" onsubmit="handleAddPrompt(event)">
+        <div class="form-group">
+          <label for="add-category">指令分類</label>
+          <select id="add-category" class="form-control" required>
+            <option value="寫作生成">寫作生成</option>
+            <option value="行銷文案">行銷文案</option>
+            <option value="工作效率">工作效率</option>
+            <option value="開發技術">開發技術</option>
+            <option value="其他" selected>其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="add-text">指令正文</label>
+          <textarea id="add-text" class="form-control" placeholder="請貼上或輸入完整的 Prompt 指令..." required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAddModal()">取消</button>
+          <button type="submit" class="btn btn-primary">儲存建立</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Prompt Modal -->
+  <div id="edit-modal" class="modal-backdrop" onclick="closeEditModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">編輯指令內容</h3>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <form id="edit-form" onsubmit="handleEditPrompt(event)">
+        <input type="hidden" id="edit-id" />
+        <div class="form-group">
+          <label for="edit-category">指令分類</label>
+          <select id="edit-category" class="form-control" required>
+            <option value="寫作生成">寫作生成</option>
+            <option value="行銷文案">行銷文案</option>
+            <option value="工作效率">工作效率</option>
+            <option value="開發技術">開發技術</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-text">指令正文</label>
+          <textarea id="edit-text" class="form-control" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+          <button type="submit" class="btn btn-primary">儲存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="./library-data.js"></script>
+  <script>
+    let localPrompts = [];
+    
+    function loadPromptsFromStorage() {
+      const stored = localStorage.getItem("PROMPT_RECORDS");
+      if (stored) {
+        localPrompts = JSON.parse(stored);
+      } else if (typeof getOrderedPrompts === 'function') {
+        localPrompts = getOrderedPrompts();
+        localStorage.setItem("PROMPT_RECORDS", JSON.stringify(localPrompts));
+      }
+    }
+
+    loadPromptsFromStorage();
+
+    const searchInput = document.getElementById("search-input");
+    const statTotal = document.getElementById("stat-total");
+    const statLine = document.getElementById("stat-line");
+    const statWeb = document.getElementById("stat-web");
+    const promptGrid = document.getElementById("prompt-grid");
+    const emptyState = document.getElementById("empty-state");
+    const resultCount = document.getElementById("result-count");
+
+    let currentCategory = "全部";
+
+    // 初始化側邊欄
+    initSidebar();
+
+    // 搜尋與篩選監聽
+    searchInput.addEventListener("input", () => {
+      renderList();
+    });
+
+    // 初始化渲染
+    updateStats();
+    renderList();
+
+    function initSidebar() {
+      // 靈感總數
+      if (typeof LIBRARY_RECORDS !== 'undefined') {
+        document.getElementById("sidebar-total-count").textContent = LIBRARY_RECORDS.length;
+      }
+      
+      // 主題列表
+      if (typeof getTopicCategories === 'function') {
+        const topicList = document.getElementById("sidebar-topic-list");
+        const topics = getTopicCategories();
+        
+        // 優先排序 Prompt 和 AI 工具
+        const sortedTopics = [...topics].sort((a, b) => {
+          const priority = ['Prompt', 'AI 工具'];
+          const aIdx = priority.indexOf(a);
+          const bIdx = priority.indexOf(b);
+          
+          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+          if (aIdx !== -1) return -1;
+          if (bIdx !== -1) return 1;
+          return a.localeCompare(b);
+        });
+
+        topicList.innerHTML = sortedTopics.map(t => `
+          <a href="./list.html?topic=${encodeURIComponent(t)}" class="topic-item">
+            <span class="topic-bullet">✦</span>
+            <span class="topic-name">${t}</span>
+          </a>
+        `).join("");
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById("sidebar-aside");
+      const overlay = document.getElementById("sidebar-overlay");
+      const toggleBtn = document.querySelector(".sidebar-mobile-toggle");
+      
+      if (sidebar.classList.contains("mobile-open")) {
+        sidebar.classList.remove("mobile-open");
+        overlay.style.display = "none";
+        toggleBtn.classList.remove("active");
+        toggleBtn.textContent = "☰";
+      } else {
+        sidebar.classList.add("mobile-open");
+        overlay.style.display = "block";
+        toggleBtn.classList.add("active");
+        toggleBtn.textContent = "✕";
+      }
+    }
+
+    function updateStats() {
+      statTotal.textContent = localPrompts.length;
+      statLine.textContent = localPrompts.filter(p => p.source_type === 'line').length;
+      statWeb.textContent = localPrompts.filter(p => p.source_type === 'web').length;
+    }
+
+    function selectCategory(category) {
+      currentCategory = category;
+      document.querySelectorAll(".category-filter-btn").forEach(btn => {
+        if (btn.getAttribute("data-category") === category) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+      renderList();
+    }
+
+    function renderList() {
+      const keyword = searchInput.value.trim().toLowerCase();
+      
+      const filtered = localPrompts.filter(p => {
+        const hitCategory = currentCategory === "全部" || p.prompt_category === currentCategory;
+        const hitKeyword = !keyword || 
+          p.prompt_text.toLowerCase().includes(keyword) || 
+          p.prompt_category.toLowerCase().includes(keyword);
+        
+        return hitCategory && hitKeyword;
+      });
+
+      resultCount.textContent = `目前顯示 ${filtered.length} / ${localPrompts.length} 筆指令。`;
+
+      if (filtered.length === 0) {
+        promptGrid.innerHTML = "";
+        emptyState.hidden = false;
+        return;
+      }
+
+      emptyState.hidden = true;
+
+      promptGrid.innerHTML = filtered.map(p => {
+        let catClass = 'other';
+        if (p.prompt_category === '寫作生成') catClass = 'write';
+        else if (p.prompt_category === '行銷文案') catClass = 'marketing';
+        else if (p.prompt_category === '工作效率') catClass = 'efficiency';
+        else if (p.prompt_category === '開發技術') catClass = 'tech';
+
+        return `
+          <div class="prompt-card">
+            <div>
+              <div class="prompt-card-header">
+                <span class="prompt-badge ${catClass}">${p.prompt_category}</span>
+                <span class="prompt-source-badge">${p.source_type === 'line' ? 'LINE 訊息' : '網頁端'}</span>
+              </div>
+              <div class="prompt-body" onclick="goToDetail('${p.id}')">${escapeHtml(p.prompt_text)}</div>
+            </div>
+            <div class="prompt-card-footer">
+              <span class="prompt-time" title="更新時間: ${p.updated_at}">建立: ${p.created_at.split(' ')[0]}</span>
+              <div class="prompt-actions">
+                <button class="btn-icon" title="一鍵複製" onclick="copyPromptText('${p.id}', event)">
+                  <svg viewBox="0 0 24 24"><path d="M8 4v12h12V4H8Zm12-2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h12ZM4 6h0.01M4 10h0.01M4 14h0.01M4 18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="btn-icon" title="編輯指令" onclick="openEditModal('${p.id}', event)">
+                  <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="btn-icon" title="詳細頁" onclick="goToDetail('${p.id}')">
+                  <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9h4m-4 4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function goToDetail(id) {
+      window.location.href = `./prompts-detail.html?id=${encodeURIComponent(id)}`;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function copyPromptText(id, event) {
+      if (event) event.stopPropagation();
+      const item = localPrompts.find(p => p.id === id);
+      if (!item) return;
+
+      navigator.clipboard.writeText(item.prompt_text)
+        .then(() => {
+          showToast("指令已成功複製到剪貼簿！");
+        })
+        .catch(err => {
+          console.error("無法複製:", err);
+          showToast("複製失敗，請手動選取複製");
+        });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast-message");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => {
+        toast.classList.remove("show");
+      }, 2500);
+    }
+
+    function openAddModal() {
+      document.getElementById("add-form").reset();
+      document.getElementById("add-modal").classList.add("show");
+    }
+
+    function closeAddModal(event) {
+      document.getElementById("add-modal").classList.remove("show");
+    }
+
+    function handleAddPrompt(event) {
+      event.preventDefault();
+      const category = document.getElementById("add-category").value;
+      const text = document.getElementById("add-text").value;
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+
+      const newPrompt = {
+        id: `prompt-${Date.now()}`,
+        prompt_category: category,
+        prompt_text: text,
+        created_at: timeStr,
+        updated_at: timeStr,
+        source_type: "web"
+      };
+
+      localPrompts.unshift(newPrompt);
+      localStorage.setItem("PROMPT_RECORDS", JSON.stringify(localPrompts));
+      closeAddModal();
+      updateStats();
+      renderList();
+      showToast("新指令已成功建立！");
+    }
+
+    function openEditModal(id, event) {
+      if (event) event.stopPropagation();
+      const item = localPrompts.find(p => p.id === id);
+      if (!item) return;
+
+      document.getElementById("edit-id").value = item.id;
+      document.getElementById("edit-category").value = item.prompt_category;
+      document.getElementById("edit-text").value = item.prompt_text;
+      
+      document.getElementById("edit-modal").classList.add("show");
+    }
+
+    function closeEditModal() {
+      document.getElementById("edit-modal").classList.remove("show");
+    }
+
+    function handleEditPrompt(event) {
+      event.preventDefault();
+      const id = document.getElementById("edit-id").value;
+      const category = document.getElementById("edit-category").value;
+      const text = document.getElementById("edit-text").value;
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+
+      const index = localPrompts.findIndex(p => p.id === id);
+      if (index !== -1) {
+        localPrompts[index].prompt_category = category;
+        localPrompts[index].prompt_text = text;
+        localPrompts[index].updated_at = timeStr;
+        localStorage.setItem("PROMPT_RECORDS", JSON.stringify(localPrompts));
+      }
+
+      closeEditModal();
+      updateStats();
+      renderList();
+      showToast("指令內容已成功更新！");
+    }
+  </script>
+</body>
+</html>

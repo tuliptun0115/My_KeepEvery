@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignature, replyMessage, pushMessage } from "@/lib/line";
 import { extractSocialContent, extractGeneralContent } from "@/lib/extractor";
-import { organizeTextInspiration, organizeSocialInspiration, organizeGeneralInspiration } from "@/lib/gemini";
-import { appendToLibraryV2 } from "@/lib/sheets";
+import { 
+  organizeTextInspiration, 
+  organizeSocialInspiration, 
+  organizeGeneralInspiration,
+  detectPromptIntent,
+  analyzePrompt
+} from "@/lib/gemini";
+import { appendToLibraryV2, appendToPromptLibrary } from "@/lib/sheets";
 
 function truncateSourceTitle(text: string, maxLength: number = 60): string {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -181,6 +187,58 @@ async function handleUrlMessage(
   }
 }
 
+async function handlePromptMessage(
+  text: string,
+  replyToken: string,
+  isExplicit: boolean,
+  userId?: string
+) {
+  await replyMessage(replyToken, "💡 偵測到 AI 指令，正在為您分類並寫入指令寶庫...");
+
+  try {
+    const promptText = isExplicit
+      ? text.replace(/^\/prompt\s*/i, "").trim()
+      : text.trim();
+
+    if (!promptText) {
+      if (userId) {
+        await pushMessage(userId, "❌ 寫入失敗：指令內容不可為空。請在 /prompt 後方輸入實際的指令文字。");
+      }
+      return;
+    }
+
+    const { category, title } = await analyzePrompt(promptText);
+
+    await appendToPromptLibrary({
+      id: crypto.randomUUID(),
+      prompt_title: title,
+      prompt_category: category,
+      prompt_text: promptText,
+      created_at: getTaipeiTimestamp(),
+      updated_at: getTaipeiTimestamp(),
+      source_type: "line",
+    });
+
+    if (userId) {
+      const displayLength = 100;
+      const previewText = promptText.length <= displayLength
+        ? promptText
+        : `${promptText.slice(0, displayLength)}...`;
+
+      let replyMsg = `📥 指令已成功收錄至指令寶庫！\n\n`;
+      replyMsg += `【標題】${title}\n`;
+      replyMsg += `【類別】${category}\n`;
+      replyMsg += `【內容】${previewText}`;
+      await pushMessage(userId, replyMsg);
+    }
+  } catch (err) {
+    console.error("[Webhook] 指令處理失敗:", err);
+    if (userId) {
+      await pushMessage(userId, "❌ 指令收錄失敗，請稍後再試。");
+    }
+  }
+}
+
 async function handleTextMessage(
   text: string,
   replyToken: string,
@@ -256,7 +314,21 @@ export async function POST(req: NextRequest) {
         if (url) {
           await handleUrlMessage(text, replyToken, userId);
         } else {
-          await handleTextMessage(text, replyToken, userId);
+          // 3. 分流：指令寶庫 vs 純文字靈感
+          const isExplicitPrompt = text.toLowerCase().startsWith("/prompt");
+          
+          if (isExplicitPrompt) {
+            await handlePromptMessage(text, replyToken, true, userId);
+          } else {
+            // 無 /prompt 前綴，呼叫 AI 判斷是否為 Prompt
+            const isAiPrompt = await detectPromptIntent(text);
+            if (isAiPrompt) {
+              await handlePromptMessage(text, replyToken, false, userId);
+            } else {
+              // 均非 Prompt，回到既有純文字靈感收藏流程
+              await handleTextMessage(text, replyToken, userId);
+            }
+          }
         }
       }
     }

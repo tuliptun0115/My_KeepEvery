@@ -12,9 +12,11 @@ interface SidebarProps {
 export function Sidebar({ topicCategories, totalCount }: SidebarProps) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isTopicsOpen, setIsTopicsOpen] = useState(true);
 
   const isHomeActive = pathname === '/';
   const isListActive = pathname === '/list';
+  const isPromptsActive = pathname ? pathname.startsWith('/prompts') : false;
 
   // 點擊連結後自動關閉手機版選單
   const handleLinkClick = () => {
@@ -72,41 +74,67 @@ export function Sidebar({ topicCategories, totalCount }: SidebarProps) {
             <span className="menu-icon">📚</span>
             <span className="menu-text">所有靈感列表</span>
           </Link>
+          <Link 
+            href="/prompts" 
+            className={`menu-item ${isPromptsActive ? 'active' : ''}`}
+            onClick={handleLinkClick}
+          >
+            <span className="menu-icon">💡</span>
+            <span className="menu-text">指令寶庫</span>
+          </Link>
         </nav>
 
         {/* 主題入口選單 */}
         <div className="sidebar-topics">
-          <div className="menu-group-label">主題快速入口</div>
-          <div className="topic-list">
-            {topicCategories.length > 0 ? (
-              (() => {
-                const sortedTopics = [...topicCategories].sort((a, b) => {
-                  const priority = ['Prompt', 'AI 工具'];
-                  const aIdx = priority.indexOf(a);
-                  const bIdx = priority.indexOf(b);
-                  
-                  if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                  if (aIdx !== -1) return -1;
-                  if (bIdx !== -1) return 1;
-                  return a.localeCompare(b);
-                });
-                
-                return sortedTopics.map((topic) => (
-                  <Link
-                    key={topic}
-                    href={`/list?topic=${encodeURIComponent(topic)}`}
-                    className="topic-item"
-                    onClick={handleLinkClick}
-                  >
-                    <span className="topic-bullet">✦</span>
-                    <span className="topic-name">{topic}</span>
-                  </Link>
-                ));
-              })()
-            ) : (
-              <div className="topic-empty">暫無主題</div>
-            )}
+          <div 
+            className="menu-group-label"
+            onClick={() => setIsTopicsOpen(!isTopicsOpen)}
+            style={{ 
+              cursor: 'pointer', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              userSelect: 'none',
+              paddingRight: '8px'
+            }}
+          >
+            <span>主題快速入口</span>
+            <span style={{ fontSize: '9px', transition: 'transform 0.2s', transform: isTopicsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+              ▼
+            </span>
           </div>
+          {isTopicsOpen && (
+            <div className="topic-list">
+              {topicCategories.length > 0 ? (
+                (() => {
+                  const sortedTopics = [...topicCategories].sort((a, b) => {
+                    const priority = ['Prompt', 'AI 工具'];
+                    const aIdx = priority.indexOf(a);
+                    const bIdx = priority.indexOf(b);
+                    
+                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                    if (aIdx !== -1) return -1;
+                    if (bIdx !== -1) return 1;
+                    return a.localeCompare(b);
+                  });
+                  
+                  return sortedTopics.map((topic) => (
+                    <Link
+                      key={topic}
+                      href={`/list?topic=${encodeURIComponent(topic)}`}
+                      className="topic-item"
+                      onClick={handleLinkClick}
+                    >
+                      <span className="topic-bullet">✦</span>
+                      <span className="topic-name">{topic}</span>
+                    </Link>
+                  ));
+                })()
+              ) : (
+                <div className="topic-empty">暫無主題</div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
     </>

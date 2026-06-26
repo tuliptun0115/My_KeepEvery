@@ -1,201 +1,344 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>靈感收藏庫</title>
-  <link rel="stylesheet" href="./library-styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>靈感收藏庫 - 控制台概覽</title>
+  <link rel="stylesheet" href="./library-styles.css">
 </head>
 <body>
-  <div class="shell">
-    <div class="cloud-wrap cloud-a" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
-    </div>
-    <div class="cloud-wrap cloud-b" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
-    </div>
-    <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
-    <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+  
+  <!-- 手機版選單切換按鈕 -->
+  <button 
+    class="sidebar-mobile-toggle"
+    onclick="toggleMobileSidebar()"
+    aria-label="切換選單"
+  >
+    ☰
+  </button>
 
-    <main class="frame">
-      <section class="hero">
-        <div class="hero-main">
-          <div class="title-sticker">
-            <h1>靈感收藏庫</h1>
-          </div>
-          <p class="hero-copy">
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <aside id="sidebar-aside" class="sidebar">
+    <!-- 頂部 Logo -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">靈感收藏庫</span>
+    </div>
+
+    <!-- 總收藏統計 -->
+    <div class="sidebar-stats">
+      <span class="stats-label">靈感總數</span>
+      <span class="stats-value" id="sidebar-total-count">0</span>
+    </div>
+
+    <!-- 主選單 -->
+    <nav class="sidebar-menu">
+      <div class="menu-group-label">主要選單</div>
+      <a 
+        href="./library-demo.html" 
+        class="menu-item active"
+      >
+        <span class="menu-icon">📊</span>
+        <span class="menu-text">控制台概覽</span>
+      </a>
+      <a 
+        href="./list.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📚</span>
+        <span class="menu-text">所有靈感列表</span>
+      </a>
+      <a 
+        href="./prompts.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">⚡</span>
+        <span class="menu-text">指令寶庫</span>
+      </a>
+    </nav>
+
+    <!-- 主題入口選單 -->
+    <div class="sidebar-topics">
+      <div class="menu-group-label">主題快速入口</div>
+      <div class="topic-list" id="sidebar-topic-list"></div>
+    </div>
+  </aside>
+  
+
+  <!-- 主內容區 -->
+  <div class="main-content">
+    
+  <div class="cloud-wrap cloud-a" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+  </div>
+  <div class="cloud-wrap cloud-b" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+  </div>
+  <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+  <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+
+    <main class="frame shell" style="position: relative; z-index: 10; maxWidth: 1200px; margin: 0 auto;">
+      <!-- Toast 提示通知 -->
+      <div id="toast-notify" class="toast-notification" style="display: none;"></div>
+
+      <!-- SaaS 大標頭與功能按鈕 -->
+      <section class="dashboard-header" style="padding: 24px 0 12px; display: flex; justifyContent: space-between; alignItems: center; flexWrap: wrap; gap: 16px;">
+        <div>
+          <h1 class="dashboard-title" style="font-size: 28px; font-weight: bold; color: #2d2d2d; margin: 0;">首頁</h1>
+          <p style="color: #666; font-size: 14px; margin-top: 4px; margin-bottom: 0;">
             讓每筆收藏能被快速理解、有效找回，並逐步累積成可再利用的個人內容資產。
           </p>
-          <div id="hero-stats" class="hero-stats"></div>
+        </div>
+        <div class="header-actions" style="display: flex; gap: 12px;">
+          <button class="link-button accent-button" style="cursor: pointer; margin: 0;" onclick="showAddModal()">
+            ➕ 手動新增靈感
+          </button>
+          <a 
+            href="https://docs.google.com/spreadsheets/d/1MvGR7l1gBAZRjCQr9VkVsePoL1qxS3DeZyguRJtj2U0/edit?gid=1533933858#gid=1533933858" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="link-button subtle-button"
+            style="margin: 0;"
+          >
+            📊 開啟試算表
+          </a>
         </div>
       </section>
 
-      <section class="notice toolbar-panel">
-        <form id="home-search-form" class="toolbar-row toolbar-home-row">
-          <label class="search toolbar-search" for="home-search-input">
-            <input
-              id="home-search-input"
-              type="search"
-              placeholder="搜尋摘要、標題、標籤或重點"
-            />
-          </label>
-          <select id="home-use-case-filter" class="filter-select"></select>
-          <select id="home-topic-filter" class="filter-select"></select>
-          <a id="search-all-link" class="link-button accent-button search-all-link" href="./list.html">查詢</a>
-        </form>
-        <div class="quick-use">
-          <div class="quick-use-label">用途入口：</div>
-          <div id="quick-use-menu" class="quick-use-menu"></div>
-        </div>
-      </section>
+      <!-- 橫向並排的 4 個 SaaS 數據統計卡 -->
+      <section class="stats-grid" id="stats-cards-container"></section>
 
+      <!-- 收藏結果表格區塊 -->
       <section class="results">
         <div class="section-head">
           <div class="section-title">最新收藏</div>
         </div>
         <div class="section-meta-row">
-          <div id="result-count" class="section-subtitle">目前顯示 0 / 0 筆收藏。</div>
-          <a class="text-action section-action section-action-large" href="./list.html">看更多收藏</a>
+          <div id="summary-label" class="section-subtitle">目前顯示最新 10 / 0 筆收藏。</div>
+          <a href="./list.html" class="text-action section-action section-action-large">
+            看更多收藏
+          </a>
         </div>
-        <div id="home-grid" class="home-grid"></div>
+
+        <!-- 表格排版 (Table Layout) -->
+        <div class="table-responsive">
+          <table class="inspiration-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;" class="rwd-hide"><input type="checkbox" disabled /></th>
+                <th style="width: 60px;">序號</th>
+                <th>摘要與原始標題</th>
+                <th style="width: 140px;">主題分類</th>
+                <th style="width: 140px;">用途分類</th>
+                <th style="width: 150px;">收藏時間</th>
+                <th style="width: 60px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="inspiration-table-body"></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
 
   <script src="./library-data.js"></script>
   <script>
-    const homeGrid = document.getElementById("home-grid");
-    const resultCount = document.getElementById("result-count");
-    const heroStats = document.getElementById("hero-stats");
-    const quickUseMenu = document.getElementById("quick-use-menu");
-    const homeSearchInput = document.getElementById("home-search-input");
-    const homeSearchForm = document.getElementById("home-search-form");
-    const homeUseCaseFilter = document.getElementById("home-use-case-filter");
-    const homeTopicFilter = document.getElementById("home-topic-filter");
-    const searchAllLink = document.getElementById("search-all-link");
+    
+  function toggleMobileSidebar() {
+    const sidebar = document.getElementById("sidebar-aside");
+    const overlay = document.getElementById("sidebar-overlay");
+    const toggleBtn = document.querySelector(".sidebar-mobile-toggle");
+    
+    if (sidebar.classList.contains("mobile-open")) {
+      sidebar.classList.remove("mobile-open");
+      overlay.style.display = "none";
+      toggleBtn.classList.remove("active");
+      toggleBtn.textContent = "☰";
+    } else {
+      sidebar.classList.add("mobile-open");
+      overlay.style.display = "block";
+      toggleBtn.classList.add("active");
+      toggleBtn.textContent = "✕";
+    }
+  }
 
+  function initSidebar(activeTopic = "") {
     const orderedRecords = getOrderedRecords();
-    const HOME_LATEST_LIMIT = 10;
-    const latestRecords = orderedRecords.slice(0, HOME_LATEST_LIMIT);
-    const highCount = orderedRecords.filter((item) => item.confidence_level === "high").length;
-    const partialCount = orderedRecords.filter((item) => item.parse_status === "partial").length;
-
-    function renderTags(tags) {
-      return tags.slice(0, 4).map((tag) => `<span class="tag">#${tag}</span>`).join("");
-    }
-
-    function renderHomeCard(item, index, total) {
-      return `
-        <a class="record compact-record record-link" href="./detail.html?id=${encodeURIComponent(item.id)}">
-          <div class="compact-main">
-            <div class="record-top compact-top">
-              <div class="compact-meta">
-                <span class="record-number">${String(index + 1).padStart(2, "0")}</span>
-                <span class="chip">${item.use_case}</span>
-                <span class="chip topic">${item.topic_category}</span>
-              </div>
-              <span class="record-time">${item.created_at}</span>
-            </div>
-            <div class="summary compact-summary">${item.summary}</div>
-            <div class="title compact-title">${item.source_title}</div>
-          </div>
-          <div class="compact-side">
-            <div class="tags compact-tags">${renderTags(item.tags)}</div>
-            <div class="record-actions compact-actions">
-              <span class="link-button subtle-button faux-button">查看內容</span>
-            </div>
-          </div>
-        </a>
-      `;
-    }
-
-    function renderQuickUse() {
-      const useCases = getUseCases();
-      quickUseMenu.innerHTML = useCases
-        .map((useCase) => `<a class="quick-use-item" href="./list.html?use_case=${encodeURIComponent(useCase)}">${useCase}</a>`)
-        .join("");
-    }
-
-    function populateHomeFilters() {
-      const useCaseOptions = ["全部用途", ...getUseCases()];
-      const topicOptions = ["全部主題", ...getTopicCategories()];
-      homeUseCaseFilter.innerHTML = useCaseOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      homeTopicFilter.innerHTML = topicOptions.map((item) => `<option value="${item}">${item}</option>`).join("");
-      homeUseCaseFilter.value = "全部用途";
-      homeTopicFilter.value = "全部主題";
-    }
-
-    function matchesKeyword(item, keyword) {
-      const normalizedKeyword = keyword.trim().toLowerCase();
-      const haystack = [
-        item.summary,
-        item.source_title,
-        item.use_case,
-        item.topic_category,
-        ...(item.tags || []),
-        ...(item.key_points || [])
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return !normalizedKeyword || haystack.includes(normalizedKeyword);
-    }
-
-    function updateSearchLink(keyword, useCase, topic) {
-      const nextParams = new URLSearchParams();
-      const trimmedKeyword = keyword.trim();
-      if (trimmedKeyword) nextParams.set("keyword", trimmedKeyword);
-      if (useCase !== "全部用途") nextParams.set("use_case", useCase);
-      if (topic !== "全部主題") nextParams.set("topic", topic);
-      const query = nextParams.toString();
-      searchAllLink.href = query ? `./list.html?${query}` : "./list.html";
-    }
-
-    function renderHome() {
-      const keyword = homeSearchInput.value || "";
-      const useCase = homeUseCaseFilter.value || "全部用途";
-      const topic = homeTopicFilter.value || "全部主題";
-      const filteredRecords = latestRecords.filter((item) => {
-        const hitKeyword = matchesKeyword(item, keyword);
-        const hitUseCase = useCase === "全部用途" || item.use_case === useCase;
-        const hitTopic = topic === "全部主題" || item.topic_category === topic;
-        return hitKeyword && hitUseCase && hitTopic;
+    document.getElementById("sidebar-total-count").textContent = orderedRecords.length;
+    
+    if (typeof getTopicCategories === 'function') {
+      const topicList = document.getElementById("sidebar-topic-list");
+      const topics = getTopicCategories();
+      
+      const sortedTopics = [...topics].sort((a, b) => {
+        const priority = ['Prompt', 'AI 工具'];
+        const aIdx = priority.indexOf(a);
+        const bIdx = priority.indexOf(b);
+        
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.localeCompare(b);
       });
-      const shownCount = filteredRecords.length;
-      const activeBits = [
-        keyword.trim() ? `關鍵字「${keyword.trim()}」` : "",
-        useCase !== "全部用途" ? `用途「${useCase}」` : "",
-        topic !== "全部主題" ? `主題「${topic}」` : ""
-      ].filter(Boolean);
-      const summaryLabel = activeBits.length
-        ? `最新 ${HOME_LATEST_LIMIT} 筆中找到 ${shownCount} 筆符合 ${activeBits.join("、")}`
-        : `目前顯示最新 ${shownCount} / ${orderedRecords.length} 筆收藏。`;
 
-      resultCount.textContent = summaryLabel;
-      heroStats.innerHTML = `
-        <span>收藏總數 ${orderedRecords.length}</span>
-        <span>高信心內容 ${highCount}</span>
-        <span>部分解析 ${partialCount}</span>
-        <span>最新更新 ${orderedRecords[0].created_at}</span>
+      topicList.innerHTML = sortedTopics.map(t => {
+        const isActive = activeTopic === t;
+        return `
+          <a href="./list.html?topic=${encodeURIComponent(t)}" class="topic-item ${isActive ? 'active' : ''}">
+            <span class="topic-bullet">✦</span>
+            <span class="topic-name">${t}</span>
+          </a>
+        `;
+      }).join("");
+    }
+  }
+
+
+    const HOME_LATEST_LIMIT = 10;
+    let records = getOrderedRecords();
+    let activeMenuId = null;
+
+    function renderStats() {
+      const highCount = records.filter(r => r.confidence_level === 'high').length;
+      const partialCount = records.filter(r => r.parse_status === 'partial').length;
+      const latestUpdate = records.length > 0 ? records[0].created_at : '無';
+      
+      const statsContainer = document.getElementById('stats-cards-container');
+      statsContainer.innerHTML = `
+        <a href="./list.html" class="stat-card link-card" title="查看所有靈感列表">
+          <div class="stat-card-label">靈感總數</div>
+          <div class="stat-card-value">${records.length}</div>
+          <div class="stat-card-trend trend-neutral">已成功清洗</div>
+        </a>
+        <a href="./list.html?confidence=high" class="stat-card link-card" title="篩選高品質內容">
+          <div class="stat-card-label">高品質 AI 整理</div>
+          <div class="stat-card-value">${highCount}</div>
+          <div class="stat-card-trend trend-positive">高信心解析</div>
+        </a>
+        <a href="./list.html?parse_status=partial" class="stat-card link-card" title="篩選部分解析內容">
+          <div class="stat-card-label">部分解析與歸檔</div>
+          <div class="stat-card-value">${partialCount}</div>
+          <div class="stat-card-trend trend-negative">等待手動補全</div>
+        </a>
+        <div class="stat-card">
+          <div class="stat-card-label">最新更新時間</div>
+          <div class="stat-card-value-small" style="font-size: 14px; font-weight: 600; height: 40px; display: flex; align-items: center;">
+            ${latestUpdate.split(' ')[0]}
+          </div>
+          <div class="stat-card-trend trend-neutral">最新紀錄</div>
+        </div>
       `;
-      homeGrid.innerHTML = filteredRecords.length
-        ? filteredRecords.map((item, index) => renderHomeCard(item, index, filteredRecords.length)).join("")
-        : `<div class="empty">最新 ${HOME_LATEST_LIMIT} 筆裡暫時找不到符合關鍵字的收藏，建議改到完整列表頁繼續查找。</div>`;
-      updateSearchLink(keyword, useCase, topic);
     }
 
-    homeSearchInput.addEventListener("input", renderHome);
-    homeUseCaseFilter.addEventListener("change", renderHome);
-    homeTopicFilter.addEventListener("change", renderHome);
+    function renderTable() {
+      const latestRecords = records.slice(0, HOME_LATEST_LIMIT);
+      document.getElementById('summary-label').textContent = `目前顯示最新 ${latestRecords.length} / ${records.length} 筆收藏。`;
+      
+      const tbody = document.getElementById('inspiration-table-body');
+      if (latestRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">暫無任何靈感收藏紀錄，請使用 LINE 或手動新增。</td></tr>`;
+        return;
+      }
 
-    homeSearchForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      window.location.href = searchAllLink.href;
+      tbody.innerHTML = latestRecords.map((item, index) => {
+        const isMenuOpen = activeMenuId === item.id;
+        const hasUrl = !!item.source_url;
+        const serial = String(records.length - index).padStart(2, '0');
+        const displayTime = item.created_at.split(' ')[0];
+
+        return `
+          <tr onclick="window.location.href='./detail.html?id=' + encodeURIComponent('${item.id}')" style="cursor: pointer;">
+            <td class="rwd-hide" onclick="event.stopPropagation()"><input type="checkbox" disabled /></td>
+            <td data-label="序號">
+              <span class="table-number">${serial}</span>
+            </td>
+            <td data-label="摘要與標題">
+              <div class="table-summary-cell">
+                <a href="./detail.html?id=${encodeURIComponent(item.id)}" class="table-summary-link" onclick="event.stopPropagation()">
+                  ${item.summary}
+                </a>
+              </div>
+              <div class="table-title-cell" title="${item.source_title}">
+                ${item.source_title}
+              </div>
+            </td>
+            <td data-label="主題分類">
+              <span class="badge-tag topic-tag">${item.topic_category || '無'}</span>
+            </td>
+            <td data-label="用途分類">
+              <span class="badge-tag usecase-tag">${item.use_case || '無'}</span>
+            </td>
+            <td data-label="收藏時間">
+              <span class="table-time">${displayTime}</span>
+            </td>
+            <td style="position: relative;" onclick="event.stopPropagation()">
+              <button class="table-action-dots" onclick="toggleMenu(event, '${item.id}')">•••</button>
+              
+              ${isMenuOpen ? `
+                <div class="context-menu" style="display: flex;">
+                  <a href="./detail.html?id=${encodeURIComponent(item.id)}" class="context-menu-item">👁️ 查看詳情</a>
+                  ${hasUrl ? `<a href="${item.source_url}" target="_blank" rel="noopener noreferrer" class="context-menu-item">🔗 打開原文</a>` : `<span class="context-menu-item disabled" title="此筆收藏無外部連結">🔗 無原文連結</span>`}
+                  <button onclick="copySummary('${item.summary}')" class="context-menu-item btn-menu">📋 複製摘要</button>
+                  <button onclick="alert('✏️ 編輯靈感已被觸發！')" class="context-menu-item btn-menu">✏️ 編輯靈感</button>
+                  <button onclick="deleteRecord()" class="context-menu-item btn-menu text-danger">❌ 刪除收藏</button>
+                </div>
+              ` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleMenu(event, id) {
+      if (activeMenuId === id) {
+        activeMenuId = null;
+      } else {
+        activeMenuId = id;
+      }
+      renderTable();
+    }
+
+    function copySummary(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 已成功複製摘要內容！');
+        activeMenuId = null;
+        renderTable();
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notify');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2000);
+    }
+
+    function deleteRecord() {
+      alert('🔐 本系統 Google Sheets 資料庫目前為唯讀狀態。\n若需刪除此筆記錄，請至 Google Sheets 試算表中進行編輯。');
+      activeMenuId = null;
+      renderTable();
+    }
+
+    function showAddModal() {
+      alert('➕ 手動新增靈感彈窗 (靜態網頁僅支援模擬，不直接寫入 Google Sheets)。');
+    }
+
+    // 點擊外部關閉選單
+    document.addEventListener('click', () => {
+      if (activeMenuId !== null) {
+        activeMenuId = null;
+        renderTable();
+      }
     });
 
-    populateHomeFilters();
-    renderHome();
-    renderQuickUse();
+    initSidebar();
+    renderStats();
+    renderTable();
   </script>
 </body>
 </html>

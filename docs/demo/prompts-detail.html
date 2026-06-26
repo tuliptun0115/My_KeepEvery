@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>指令詳情 - Demo</title>
+  <link rel="stylesheet" href="./library-styles.css" />
+  <style>
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: #ffffff;
+      border: 3px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      width: 90%;
+      max-width: 600px;
+      padding: 24px;
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+    .modal-backdrop.show .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 3px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .form-control {
+      width: 100%;
+      border: 3px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .form-control:focus {
+      outline: none;
+      background: var(--accent-soft);
+    }
+    textarea.form-control {
+      min-height: 180px;
+      resize: vertical;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 12px;
+      border: 3px solid var(--border);
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--border);
+      font-size: 14px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--border);
+    }
+    .btn:active {
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 var(--border);
+    }
+    .btn-primary {
+      background: var(--accent-soft);
+    }
+    .btn-secondary {
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <!-- 手機版選單切換按鈕 -->
+  <button class="sidebar-mobile-toggle" onclick="toggleMobileSidebar()" aria-label="切換選單">☰</button>
+
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <!-- Sidebar 側邊欄 -->
+  
+  <!-- 手機版選單切換按鈕 -->
+  <button 
+    class="sidebar-mobile-toggle"
+    onclick="toggleMobileSidebar()"
+    aria-label="切換選單"
+  >
+    ☰
+  </button>
+
+  <!-- 手機版選單背景遮罩 -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
+
+  <aside id="sidebar-aside" class="sidebar">
+    <!-- 頂部 Logo -->
+    <div class="sidebar-logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">靈感收藏庫</span>
+    </div>
+
+    <!-- 總收藏統計 -->
+    <div class="sidebar-stats">
+      <span class="stats-label">靈感總數</span>
+      <span class="stats-value" id="sidebar-total-count">0</span>
+    </div>
+
+    <!-- 主選單 -->
+    <nav class="sidebar-menu">
+      <div class="menu-group-label">主要選單</div>
+      <a 
+        href="./library-demo.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📊</span>
+        <span class="menu-text">控制台概覽</span>
+      </a>
+      <a 
+        href="./list.html" 
+        class="menu-item "
+      >
+        <span class="menu-icon">📚</span>
+        <span class="menu-text">所有靈感列表</span>
+      </a>
+      <a 
+        href="./prompts.html" 
+        class="menu-item active"
+      >
+        <span class="menu-icon">⚡</span>
+        <span class="menu-text">指令寶庫</span>
+      </a>
+    </nav>
+
+    <!-- 主題入口選單 -->
+    <div class="sidebar-topics">
+      <div class="menu-group-label">主題快速入口</div>
+      <div class="topic-list" id="sidebar-topic-list"></div>
+    </div>
+  </aside>
+  
+
+  <!-- 主內容區 -->
+  <div class="main-content">
+    <div class="shell">
+      <div class="cloud-wrap cloud-a" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+      </div>
+      <div class="cloud-wrap cloud-b" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+      </div>
+      <div class="sparkle sparkle-a" aria-hidden="true">✦</div>
+      <div class="sparkle sparkle-b" aria-hidden="true">✦</div>
+
+      <main class="frame">
+        <!-- SaaS 大標頭 -->
+        <section class="dashboard-header" style="padding: 24px 0 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; position: relative; z-index: 10;">
+          <div>
+            <h1 class="dashboard-title" style="margin: 0; font-size: 28px; font-weight: bold; color: #2d2d2d;">指令詳情</h1>
+            <p style="color: #666; font-size: 14px; margin-top: 4px; margin-bottom: 0;">閱讀與管理該 Prompt 詳細資訊，可直接點擊複製或對其進行編輯修改。</p>
+          </div>
+        </section>
+
+        <section class="results">
+          <div id="prompt-detail-container"></div>
+          <div id="detail-empty" class="empty" hidden>找不到該指令內容。</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast 複製成功提示 -->
+  <div id="toast-message" class="toast">複製成功！</div>
+
+  <!-- Edit Prompt Modal -->
+  <div id="edit-modal" class="modal-backdrop" onclick="closeEditModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">編輯指令內容</h3>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <form id="edit-form" onsubmit="handleEditPrompt(event)">
+        <input type="hidden" id="edit-id" />
+        <div class="form-group">
+          <label for="edit-category">指令分類</label>
+          <select id="edit-category" class="form-control" required>
+            <option value="寫作生成">寫作生成</option>
+            <option value="行銷文案">行銷文案</option>
+            <option value="工作效率">工作效率</option>
+            <option value="開發技術">開發技術</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-text">指令正文</label>
+          <textarea id="edit-text" class="form-control" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+          <button type="submit" class="btn btn-primary">儲存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="./library-data.js"></script>
+  <script>
+    let localPrompts = [];
+    
+    function loadPromptsFromStorage() {
+      const stored = localStorage.getItem("PROMPT_RECORDS");
+      if (stored) {
+        localPrompts = JSON.parse(stored);
+      } else if (typeof getOrderedPrompts === 'function') {
+        localPrompts = getOrderedPrompts();
+        localStorage.setItem("PROMPT_RECORDS", JSON.stringify(localPrompts));
+      }
+    }
+
+    loadPromptsFromStorage();
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const container = document.getElementById("prompt-detail-container");
+    const emptyState = document.getElementById("detail-empty");
+
+    const record = id ? localPrompts.find(p => p.id === id) : localPrompts[0];
+
+    // 初始化側邊欄
+    initSidebar();
+
+    if (!record) {
+      emptyState.hidden = false;
+    } else {
+      renderPromptDetail();
+    }
+
+    function initSidebar() {
+      // 靈感總數
+      if (typeof LIBRARY_RECORDS !== 'undefined') {
+        document.getElementById("sidebar-total-count").textContent = LIBRARY_RECORDS.length;
+      }
+      
+      // 主題列表
+      if (typeof getTopicCategories === 'function') {
+        const topicList = document.getElementById("sidebar-topic-list");
+        const topics = getTopicCategories();
+        
+        // 優先排序 Prompt 和 AI 工具
+        const sortedTopics = [...topics].sort((a, b) => {
+          const priority = ['Prompt', 'AI 工具'];
+          const aIdx = priority.indexOf(a);
+          const bIdx = priority.indexOf(b);
+          
+          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+          if (aIdx !== -1) return -1;
+          if (bIdx !== -1) return 1;
+          return a.localeCompare(b);
+        });
+
+        topicList.innerHTML = sortedTopics.map(t => `
+          <a href="./list.html?topic=${encodeURIComponent(t)}" class="topic-item">
+            <span class="topic-bullet">✦</span>
+            <span class="topic-name">${t}</span>
+          </a>
+        `).join("");
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById("sidebar-aside");
+      const overlay = document.getElementById("sidebar-overlay");
+      const toggleBtn = document.querySelector(".sidebar-mobile-toggle");
+      
+      if (sidebar.classList.contains("mobile-open")) {
+        sidebar.classList.remove("mobile-open");
+        overlay.style.display = "none";
+        toggleBtn.classList.remove("active");
+        toggleBtn.textContent = "☰";
+      } else {
+        sidebar.classList.add("mobile-open");
+        overlay.style.display = "block";
+        toggleBtn.classList.add("active");
+        toggleBtn.textContent = "✕";
+      }
+    }
+
+    function renderPromptDetail() {
+      const index = localPrompts.findIndex(p => p.id === record.id);
+      const prevPrompt = index < localPrompts.length - 1 ? localPrompts[index + 1] : null;
+      const nextPrompt = index > 0 ? localPrompts[index - 1] : null;
+      const serial = String(localPrompts.length - index).padStart(2, "0");
+
+      let catClass = 'other';
+      if (record.prompt_category === '寫作生成') catClass = 'write';
+      else if (record.prompt_category === '行銷文案') catClass = 'marketing';
+      else if (record.prompt_category === '工作效率') catClass = 'efficiency';
+      else if (record.prompt_category === '開發技術') catClass = 'tech';
+
+      container.innerHTML = `
+        <article class="prompt-detail-card">
+          <div class="record-top">
+            <span class="record-number">#${serial}</span>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
+              <span class="record-time">建立: ${record.created_at}</span>
+              <a class="link-button" href="./prompts.html">回指令列表</a>
+            </div>
+          </div>
+          
+          <div class="prompt-detail-meta" style="margin-top: 14px;">
+            <span class="prompt-badge ${catClass}">${record.prompt_category}</span>
+            <span class="prompt-source-badge">${record.source_type === 'line' ? 'LINE 訊息' : '網頁端新增'}</span>
+            <span class="prompt-time" style="margin-left: auto;">最後更新: ${record.updated_at}</span>
+          </div>
+
+          <div class="prompt-detail-text">
+            <div class="prompt-copy-bubble">
+              <button class="btn-icon" title="複製指令" onclick="copyPromptText()">
+                <svg viewBox="0 0 24 24"><path d="M8 4v12h12V4H8Zm12-2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h12ZM4 6h0.01M4 10h0.01M4 14h0.01M4 18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+            ${escapeHtml(record.prompt_text)}
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+            <button class="btn btn-primary" style="flex-grow: 1;" onclick="copyPromptText()">一鍵複製 Prompt</button>
+            <button class="btn btn-secondary" onclick="openEditModal()">編輯指令</button>
+          </div>
+
+          <div class="detail-nav">
+            ${prevPrompt ? `<a href="./prompts-detail.html?id=${encodeURIComponent(prevPrompt.id)}">← 上一筆</a>` : `<span></span>`}
+            ${nextPrompt ? `<a href="./prompts-detail.html?id=${encodeURIComponent(nextPrompt.id)}">下一筆 →</a>` : `<span></span>`}
+          </div>
+        </article>
+      `;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function copyPromptText() {
+      navigator.clipboard.writeText(record.prompt_text)
+        .then(() => {
+          showToast("指令已成功複製到剪貼簿！");
+        })
+        .catch(err => {
+          console.error("無法複製:", err);
+          showToast("複製失敗，請手動選取複製");
+        });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast-message");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => {
+        toast.classList.remove("show");
+      }, 2500);
+    }
+
+    function openEditModal() {
+      document.getElementById("edit-id").value = record.id;
+      document.getElementById("edit-category").value = record.prompt_category;
+      document.getElementById("edit-text").value = record.prompt_text;
+      document.getElementById("edit-modal").classList.add("show");
+    }
+
+    function closeEditModal() {
+      document.getElementById("edit-modal").classList.remove("show");
+    }
+
+    function handleEditPrompt(event) {
+      event.preventDefault();
+      const id = document.getElementById("edit-id").value;
+      const category = document.getElementById("edit-category").value;
+      const text = document.getElementById("edit-text").value;
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+
+      const index = localPrompts.findIndex(p => p.id === id);
+      if (index !== -1) {
+        localPrompts[index].prompt_category = category;
+        localPrompts[index].prompt_text = text;
+        localPrompts[index].updated_at = timeStr;
+        localStorage.setItem("PROMPT_RECORDS", JSON.stringify(localPrompts));
+        
+        record.prompt_category = category;
+        record.prompt_text = text;
+        record.updated_at = timeStr;
+      }
+
+      closeEditModal();
+      renderPromptDetail();
+      showToast("指令內容已成功更新！");
+    }
+  </script>
+</body>
+</html>

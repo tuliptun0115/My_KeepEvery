@@ -29,6 +29,17 @@ export interface LibraryRecordV2 {
   parse_status: string;
 }
 
+export interface PromptRecord {
+  id: string;
+  prompt_category: string;
+  prompt_text: string;
+  created_at: string;
+  updated_at: string;
+  source_type: string; // 'line' | 'web'
+  prompt_title?: string;
+}
+
+
 interface RawSheetItem {
   time?: string;
   title?: string;
@@ -272,3 +283,179 @@ export async function updateLibraryV2Record(data: LibraryRecordV2) {
   }
 }
 
+/**
+ * 從 Google Sheets 抓取指令寶庫 (Prompt Library) 資料
+ */
+export async function fetchPromptLibrary(): Promise<PromptRecord[]> {
+  try {
+    const webAppUrl = process.env.GOOGLE_GAS_URL;
+    const secret = process.env.GOOGLE_GAS_SECRET;
+
+    if (!webAppUrl) {
+      console.error("[Sheets] 錯誤: 未配置 GOOGLE_GAS_URL");
+      return [];
+    }
+
+    const maskedUrl = webAppUrl.substring(0, 25) + "..." + webAppUrl.substring(webAppUrl.length - 10);
+    console.log(`[Sheets] 開始抓取 prompt_library 資料... URL: ${maskedUrl}`);
+
+    const response = await fetch(`${webAppUrl}?secret=${secret}&sheet_name=prompt_library`, {
+      next: { revalidate: 60 },
+    });
+
+    console.log(`[Sheets] GAS prompt_library 回應狀態: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[Sheets] GAS prompt_library 讀取失敗 (${response.status}): ${text.substring(0, 100)}`);
+      return [];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawData = await response.json() as any[];
+    console.log(`[Sheets] 成功抓取 ${rawData.length} 筆 prompt_library 原始資料`);
+
+    return rawData
+      .reverse() // 最新指令排在前面
+      .map((item) => ({
+        id: String(item.id || ""),
+        prompt_category: item.prompt_category || "",
+        prompt_text: item.prompt_text || "",
+        created_at: item.created_at || "",
+        updated_at: item.updated_at || "",
+        source_type: item.source_type || "",
+        prompt_title: item.prompt_title || "",
+      }));
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[Sheets] prompt_library 讀取異常錯誤:", message);
+    return [];
+  }
+}
+
+/**
+ * 將指令資料發送到 Google Sheets 的 prompt_library
+ */
+export async function appendToPromptLibrary(data: PromptRecord) {
+  try {
+    const webAppUrl = process.env.GOOGLE_GAS_URL;
+
+    if (!webAppUrl) {
+      throw new Error("未配置 GOOGLE_GAS_URL");
+    }
+
+    const response = await fetch(webAppUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: process.env.GOOGLE_GAS_SECRET,
+        sheet_name: "prompt_library",
+        id: data.id,
+        prompt_category: data.prompt_category,
+        prompt_text: data.prompt_text,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        source_type: data.source_type,
+        prompt_title: data.prompt_title || "",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GAS WebApp prompt_library 寫入失敗: ${response.status}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Google Apps Script prompt_library append error:", error);
+    throw error;
+  }
+}
+
+/**
+ * 更新指令寶庫 (Prompt Library) 資料
+ */
+export async function updatePromptLibraryRecord(data: PromptRecord) {
+  try {
+    const webAppUrl = process.env.GOOGLE_GAS_URL;
+
+    if (!webAppUrl) {
+      throw new Error("未配置 GOOGLE_GAS_URL");
+    }
+
+    const response = await fetch(webAppUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: process.env.GOOGLE_GAS_SECRET,
+        sheet_name: "prompt_library",
+        action: "update_row",
+        id: data.id,
+        prompt_category: data.prompt_category,
+        prompt_text: data.prompt_text,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        source_type: data.source_type,
+        prompt_title: data.prompt_title || "",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GAS WebApp prompt_library 更新失敗: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.result !== "success") {
+      throw new Error(result.message || "更新失敗");
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Google Apps Script prompt_library update error:", error);
+    throw error;
+  }
+}
+
+/**
+ * 刪除指令寶庫 (Prompt Library) 單筆資料
+ */
+export async function deletePromptLibraryRecord(id: string) {
+  try {
+    const webAppUrl = process.env.GOOGLE_GAS_URL;
+
+    if (!webAppUrl) {
+      throw new Error("未配置 GOOGLE_GAS_URL");
+    }
+
+    const response = await fetch(webAppUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: process.env.GOOGLE_GAS_SECRET,
+        sheet_name: "prompt_library",
+        action: "delete_row",
+        id,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GAS WebApp prompt_library 刪除失敗: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.result !== "success") {
+      throw new Error(result.message || "刪除失敗");
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Google Apps Script prompt_library delete error:", error);
+    throw error;
+  }
+}

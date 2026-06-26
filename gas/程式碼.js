@@ -12,8 +12,9 @@
  */
 
 var LIBRARY_V2_SHEET_NAME = "library_v2";
+var PROMPT_LIBRARY_SHEET_NAME = "prompt_library";
 // 若已知舊版工作表名稱，請直接填在這裡，例如 "Sheet1"。
-// 若留空，程式會自動選第一張非 library_v2 的工作表作為舊資料流落點。
+// 若留空，程式會自動選第一張非 library_v2 且非 prompt_library 的工作表作為舊資料流落點。
 var LEGACY_SHEET_NAME = "";
 var LIBRARY_V2_HEADERS = [
   "id",
@@ -31,6 +32,15 @@ var LIBRARY_V2_HEADERS = [
   "topic_category",
   "confidence_level",
   "parse_status"
+];
+var PROMPT_LIBRARY_HEADERS = [
+  "id",
+  "prompt_category",
+  "prompt_text",
+  "created_at",
+  "updated_at",
+  "source_type",
+  "prompt_title"
 ];
 
 function getOrCreateSheetByName(sheetName) {
@@ -56,7 +66,7 @@ function getLegacySheet() {
 
   var sheets = spreadsheet.getSheets();
   for (var i = 0; i < sheets.length; i++) {
-    if (sheets[i].getName() !== LIBRARY_V2_SHEET_NAME) {
+    if (sheets[i].getName() !== LIBRARY_V2_SHEET_NAME && sheets[i].getName() !== PROMPT_LIBRARY_SHEET_NAME) {
       return sheets[i];
     }
   }
@@ -82,6 +92,24 @@ function ensureLibraryV2Headers(sheet) {
   }
 }
 
+function ensurePromptLibraryHeaders(sheet) {
+  var currentHeaders = sheet
+    .getRange(1, 1, 1, PROMPT_LIBRARY_HEADERS.length)
+    .getValues()[0];
+  var shouldRewriteHeaders = false;
+
+  for (var i = 0; i < PROMPT_LIBRARY_HEADERS.length; i++) {
+    if (currentHeaders[i] !== PROMPT_LIBRARY_HEADERS[i]) {
+      shouldRewriteHeaders = true;
+      break;
+    }
+  }
+
+  if (shouldRewriteHeaders) {
+    sheet.getRange(1, 1, 1, PROMPT_LIBRARY_HEADERS.length).setValues([PROMPT_LIBRARY_HEADERS]);
+  }
+}
+
 function doGet(e) {
   // 安全驗證碼：需與您的 .env.local 中的 GOOGLE_GAS_SECRET 一致
   var SECRET_TOKEN = "KEEP_EVERY_SECRET_123"; 
@@ -89,6 +117,35 @@ function doGet(e) {
   // 安全性檢查
   if (e.parameter.secret !== SECRET_TOKEN) {
     return ContentService.createTextOutput("Unauthorized").setStatusCode(401);
+  }
+
+  // 判斷是否要求指令寶庫 prompt_library
+  if (e.parameter.sheet_name === PROMPT_LIBRARY_SHEET_NAME) {
+    var promptLibrarySheet = getOrCreateSheetByName(PROMPT_LIBRARY_SHEET_NAME);
+    ensurePromptLibraryHeaders(promptLibrarySheet);
+    var data = promptLibrarySheet.getDataRange().getValues();
+    
+    // 若分頁為空 (僅標題或全空)
+    if (data.length <= 1) {
+      return ContentService.createTextOutput(JSON.stringify([]))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var jsonData = [];
+    for (var i = 1; i < data.length; i++) {
+      jsonData.push({
+        id: data[i][0] || "",
+        prompt_category: data[i][1] || "",
+        prompt_text: data[i][2] || "",
+        created_at: data[i][3] || "",
+        updated_at: data[i][4] || "",
+        source_type: data[i][5] || "",
+        prompt_title: data[i][6] || ""
+      });
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(jsonData))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 
   // 判斷是否要求新版 library_v2
@@ -168,16 +225,26 @@ function doPost(e) {
   if (data.action === "overwrite_sheet") {
     if (data.sheet_name === LIBRARY_V2_SHEET_NAME) {
       var libraryV2Sheet = getOrCreateSheetByName(LIBRARY_V2_SHEET_NAME);
-      
-      // 清空所有內容 (包括 headers 均清除，以便重設)
       libraryV2Sheet.clearContents();
-      
-      // 重設 headers
       ensureLibraryV2Headers(libraryV2Sheet);
       
-      // 批次寫入 row 資料
       if (data.rows && data.rows.length > 0) {
         var range = libraryV2Sheet.getRange(2, 1, data.rows.length, LIBRARY_V2_HEADERS.length);
+        range.setValues(data.rows);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ 
+        "result": "success", 
+        "action": "overwrite_sheet",
+        "count": data.rows ? data.rows.length : 0 
+      })).setMimeType(ContentService.MimeType.JSON);
+    } else if (data.sheet_name === PROMPT_LIBRARY_SHEET_NAME) {
+      var promptLibrarySheet = getOrCreateSheetByName(PROMPT_LIBRARY_SHEET_NAME);
+      promptLibrarySheet.clearContents();
+      ensurePromptLibraryHeaders(promptLibrarySheet);
+      
+      if (data.rows && data.rows.length > 0) {
+        var range = promptLibrarySheet.getRange(2, 1, data.rows.length, PROMPT_LIBRARY_HEADERS.length);
         range.setValues(data.rows);
       }
       
@@ -233,8 +300,68 @@ function doPost(e) {
         return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "ID not found: " + targetId }))
           .setMimeType(ContentService.MimeType.JSON);
       }
+    } else if (data.sheet_name === PROMPT_LIBRARY_SHEET_NAME) {
+      var promptLibrarySheet = getOrCreateSheetByName(PROMPT_LIBRARY_SHEET_NAME);
+      ensurePromptLibraryHeaders(promptLibrarySheet);
+      var sheetData = promptLibrarySheet.getDataRange().getValues();
+      var targetId = data.id;
+      var foundRowIndex = -1;
+
+      for (var i = 1; i < sheetData.length; i++) {
+        if (String(sheetData[i][0]) === String(targetId)) {
+          foundRowIndex = i + 1;
+          break;
+        }
+      }
+
+      if (foundRowIndex !== -1) {
+        var range = promptLibrarySheet.getRange(foundRowIndex, 1, 1, PROMPT_LIBRARY_HEADERS.length);
+        range.setValues([[
+          data.id || "",
+          data.prompt_category || "",
+          data.prompt_text || "",
+          data.created_at || "",
+          data.updated_at || "",
+          data.source_type || "",
+          data.prompt_title || ""
+        ]]);
+        return ContentService.createTextOutput(JSON.stringify({ "result": "success", "action": "update_row" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "ID not found: " + targetId }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
     } else {
       return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "Unsupported sheet for update" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 支援刪除單一 Row 資料 (action = delete_row)
+  if (data.action === "delete_row") {
+    if (data.sheet_name === LIBRARY_V2_SHEET_NAME || data.sheet_name === PROMPT_LIBRARY_SHEET_NAME) {
+      var targetSheet = getOrCreateSheetByName(data.sheet_name);
+      var sheetData = targetSheet.getDataRange().getValues();
+      var targetId = data.id;
+      var foundRowIndex = -1;
+
+      for (var i = 1; i < sheetData.length; i++) {
+        if (String(sheetData[i][0]) === String(targetId)) {
+          foundRowIndex = i + 1; // 1-indexed + header row
+          break;
+        }
+      }
+
+      if (foundRowIndex !== -1) {
+        targetSheet.deleteRow(foundRowIndex);
+        return ContentService.createTextOutput(JSON.stringify({ "result": "success", "action": "delete_row" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "ID not found: " + targetId }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } else {
+      return ContentService.createTextOutput(JSON.stringify({ "result": "error", "message": "Unsupported sheet for delete" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
   }
@@ -259,6 +386,19 @@ function doPost(e) {
       data.topic_category || "",
       data.confidence_level || "",
       data.parse_status || ""
+    ]);
+  } else if (data.sheet_name === PROMPT_LIBRARY_SHEET_NAME) {
+    var promptLibrarySheet = getOrCreateSheetByName(PROMPT_LIBRARY_SHEET_NAME);
+    ensurePromptLibraryHeaders(promptLibrarySheet);
+
+    promptLibrarySheet.appendRow([
+      data.id || "",
+      data.prompt_category || "",
+      data.prompt_text || "",
+      data.created_at || "",
+      data.updated_at || "",
+      data.source_type || "",
+      data.prompt_title || ""
     ]);
   } else {
     // 舊資料流固定寫回舊工作表，避免受到目前 active sheet 影響
